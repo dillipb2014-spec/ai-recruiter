@@ -1,0 +1,19 @@
+model_list:
+  - model_name: genius-ai-model
+    litellm_params:
+      model: ollama/llama3:latest
+      api_base: http://localhost:11434
+      temperature: 0.2
+      max_tokens: 1024
+  - model_name: genius-ai-model
+    litellm_params:
+      model: gemini/gemini-2.0-flash
+      api_key: os.environ/GOOGLE_API_KEY
+      temperature: 0.2
+      max_tokens: 1024
+
+litellm_settings:
+  drop_params: true
+  set_verbose: false
+  request_timeout: 180
+  fallbacks: [{"genius-ai-model": ["genius-ai-model"]}]

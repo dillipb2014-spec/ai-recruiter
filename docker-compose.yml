@@ -1,0 +1,52 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ai_recruiter
+      POSTGRES_USER: recruiter
+      POSTGRES_PASSWORD: recruiter_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/db/migrations:/docker-entrypoint-initdb.d
+
+  backend:
+    build: ./backend
+    ports:
+      - "4000:4000"
+    environment:
+      DATABASE_URL: postgres://recruiter:recruiter_pass@postgres:5432/ai_recruiter
+      AI_SERVICE_URL: http://ai-service:8000
+    depends_on:
+      - postgres
+    volumes:
+      - ./backend:/app
+      - uploads:/app/uploads
+
+  ai-service:
+    build: ./ai-service
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgres://recruiter:recruiter_pass@postgres:5432/ai_recruiter
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    depends_on:
+      - postgres
+    volumes:
+      - uploads:/app/uploads
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  uploads:

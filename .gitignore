@@ -1,0 +1,23 @@
+# Secrets
+.env
+.env.local
+.env.production
+
+# Dependencies
+node_modules/
+.next/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Uploads
+backend/uploads/
+/tmp/uploads/
+
+# Keys
+*.pem
+*.key
+
+# OS
+.DS_Store

@@ -1,0 +1,31 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Candidate {
+  id                 String   @id @default(uuid())
+  fullName           String
+  email              String   @unique
+  phone              String
+  currentLocation    String
+  noticePeriod       String
+  position           String
+  currentCompany     String
+  yearsExperience    Float
+  currentCTC         Float
+  expectedCTC        Float
+  linkedInUrl        String?
+  openToRelocation   Boolean  @default(false)
+  resumeLink         String
+  status             String   @default("UPLOADED") // UPLOADED, PENDING, SCREEN_SELECT, SCREEN_REJECT
+  suitabilityScore   Float?
+  aiRemarks          String?  @db.Text
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}

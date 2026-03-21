@@ -1,0 +1,85 @@
+const nodemailer = require("nodemailer");
+
+const FROM = process.env.SMTP_FROM || "JUSPAY AI Recruitment <no-reply@juspay.in>";
+
+function _transport() {
+  return nodemailer.createTransport({
+    host:   process.env.SMTP_HOST || "smtp.gmail.com",
+    port:   parseInt(process.env.SMTP_PORT || "587", 10),
+    secure: process.env.SMTP_SECURE === "true",
+    auth:   { user: process.env.SMTP_USER || "", pass: process.env.SMTP_PASS || "" },
+  });
+}
+
+function _rejectionHtml(name, role) {
+  return `<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;color:#111827;max-width:560px;margin:0 auto;padding:32px 24px">
+  <p style="margin:0 0 24px;font-size:13px;color:#6b7280">JUSPAY AI · Recruitment Team</p>
+  <p style="margin:0 0 16px;font-size:15px">Dear ${name},</p>
+  <p style="margin:0 0 16px;font-size:14px;line-height:1.7;color:#374151">
+    Thank you for your interest in the <strong>${role || "position"}</strong> role at Juspay.
+    After careful review, we will not be moving forward with your application at this time.
+  </p>
+  <p style="margin:0 0 16px;font-size:14px;line-height:1.7;color:#374151">
+    We appreciate the effort you invested and wish you every success in your future endeavours.
+  </p>
+  <p style="margin:0;font-size:14px;font-weight:600">The Recruitment Team, JUSPAY AI</p>
+  <hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb">
+  <p style="margin:0;font-size:11px;color:#9ca3af">This is an automated message. Please do not reply.</p>
+</body></html>`;
+}
+
+function _screeningHtml(name, role, link) {
+  return `<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;color:#111827;max-width:560px;margin:0 auto;padding:32px 24px">
+  <p style="margin:0 0 24px;font-size:13px;color:#6b7280">JUSPAY AI · Recruitment Team</p>
+  <p style="margin:0 0 16px;font-size:15px">Dear ${name},</p>
+  <p style="margin:0 0 16px;font-size:14px;line-height:1.7;color:#374151">
+    Thank you for applying for the <strong>${role || "position"}</strong> role at Juspay.
+    Your application has been received successfully.
+  </p>
+  <p style="margin:0 0 16px;font-size:14px;line-height:1.7;color:#374151">
+    As the next step, please complete a short technical screening test.
+  </p>
+  <a href="${link}" style="display:inline-block;margin:8px 0 24px;padding:12px 28px;background:#0052cc;color:#fff;border-radius:7px;font-size:14px;font-weight:600;text-decoration:none">Start Screening Test →</a>
+  <p style="margin:0 0 4px;font-size:13px;color:#6b7280">Or copy: <span style="color:#0052cc">${link}</span></p>
+  <hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb">
+  <p style="margin:0;font-size:11px;color:#9ca3af">This is an automated message. Please do not reply.</p>
+</body></html>`;
+}
+
+async function sendScreeningTestEmail(candidate, jobRoleTitle) {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
+  const link = `${process.env.APP_URL || "http://localhost:3000"}/screening-test/${candidate.id}`;
+  await _transport().sendMail({
+    from:    FROM,
+    to:      candidate.email,
+    subject: `Next Step: Screening Test — ${jobRoleTitle || "Position"}`,
+    html:    _screeningHtml(candidate.full_name, jobRoleTitle, link),
+  });
+}
+
+async function sendRejectionEmails(candidates) {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS)
+    throw new Error("SMTP credentials not configured — set SMTP_USER and SMTP_PASS in backend/.env");
+
+  const t = _transport();
+  let sent = 0, failed = 0;
+  const errors = [];
+
+  for (const c of candidates) {
+    try {
+      await t.sendMail({
+        from:    FROM,
+        to:      c.email,
+        subject: `Your Application Update — ${c.job_role_title || "Position"}`,
+        html:    _rejectionHtml(c.full_name, c.job_role_title),
+      });
+      sent++;
+    } catch (err) {
+      failed++;
+      errors.push(`${c.email}: ${err.message}`);
+    }
+  }
+  return { sent, failed, errors };
+}
+
+module.exports = { sendRejectionEmails, sendScreeningTestEmail };
