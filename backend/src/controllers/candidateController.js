@@ -139,7 +139,7 @@ async function listCandidates(req, res) {
 async function bulkUpdateStatus(req, res) {
   const { ids, status } = req.body;
 
-  const ALLOWED_STATUSES = ["SCREEN_REJECT", "SCREEN_SELECT", "screen_reject", "screen_select", "hired", "rejected", "evaluated", "uploaded", "screening"];
+  const ALLOWED_STATUSES = ["SCREEN_REJECT", "SCREEN_SELECT", "screen_reject", "screen_select", "hired", "rejected", "evaluated", "uploaded", "screening", "PENDING"];
   if (!Array.isArray(ids) || ids.length === 0)
     return res.status(400).json({ error: "ids array is required" });
   if (!ALLOWED_STATUSES.includes(status))

@@ -53,15 +53,25 @@ async function uploadResume(req, res) {
   );
 
   const cStatus = candidate.rows[0]?.status;
-  // For 'uploaded' candidates: trigger AI to get resume_score but keep status as 'uploaded'.
-  // Status only moves to 'screening' when recruiter clicks "Send Screening Test".
-  // For all other statuses: move to 'screening' as normal.
-  if (cStatus !== "uploaded") {
-    await db.query("UPDATE candidates SET status = 'screening' WHERE id = $1", [candidateId]);
+
+  // Always reset to PENDING and re-trigger AI on resume update.
+  // Exception: 'uploaded' bulk candidates stay as 'uploaded' until
+  // recruiter explicitly clicks 'Send Screening Test'.
+  if (cStatus === "uploaded") {
+    // Just score the resume — don't change status
+    triggerAIScreening(result.rows[0].id, resolvedPath).catch((err) =>
+      console.error("AI screening trigger failed:", err.message)
+    );
+  } else {
+    // Recruiter updated resume — reset to PENDING and re-run full evaluation
+    await db.query(
+      "UPDATE candidates SET status = 'PENDING', ai_decision_insight = NULL WHERE id = $1",
+      [candidateId]
+    );
+    triggerAIScreening(result.rows[0].id, resolvedPath).catch((err) =>
+      console.error("AI screening trigger failed:", err.message)
+    );
   }
-  triggerAIScreening(result.rows[0].id, resolvedPath).catch((err) =>
-    console.error("AI screening trigger failed:", err.message)
-  );
 
   res.status(201).json({ message: "Resume uploaded successfully", resume: result.rows[0] });
 }
