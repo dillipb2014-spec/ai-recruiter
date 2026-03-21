@@ -5,6 +5,7 @@ import { uploadResume, bulkUpdateStatus } from "@/lib/api";
 const STATUS_COLOR = {
   applied:        { bg: "#eff6ff",  color: "#2563eb" },
   uploaded:       { bg: "#f0fdf4",  color: "#15803d" },
+  PENDING:        { bg: "#fef3c7",  color: "#d97706" },
   screening:      { bg: "#fef3c7",  color: "#d97706" },
   SCREEN_SELECT:  { bg: "#4f46e5",  color: "#ffffff" },
   SCREEN_REJECT:  { bg: "#fee2e2",  color: "#dc2626" },
@@ -18,6 +19,7 @@ const STATUS_COLOR = {
 
 const STATUS_LABEL = {
   uploaded:       "Uploaded",
+  PENDING:        "Re-Screening…",
   SCREEN_SELECT:  "Pending Recruiter Action",
   SCREEN_REJECT:  "Rejected by AI",
   screen_select:  "Pending Recruiter Action",

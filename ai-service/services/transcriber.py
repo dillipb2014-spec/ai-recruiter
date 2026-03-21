@@ -1,19 +1,25 @@
 import asyncio
 import os
-import whisper
-from functools import lru_cache
 
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")  # tiny | base | small | medium | large
 
-@lru_cache(maxsize=1)
+_model = None
+
 def _load_model():
-    return whisper.load_model(WHISPER_MODEL)
+    global _model
+    if _model is not None:
+        return _model
+    try:
+        import whisper
+        print(f"INFO: Loading Whisper model '{WHISPER_MODEL}'...")
+        _model = whisper.load_model(WHISPER_MODEL)
+        print("INFO: Whisper model loaded.")
+        return _model
+    except Exception as e:
+        print(f"WARNING: Whisper model failed to load: {e}")
+        raise RuntimeError(f"Whisper unavailable: {e}") from e
 
 async def transcribe(audio_path: str) -> dict:
-    """
-    Run Whisper transcription in a thread pool to avoid blocking the event loop.
-    Returns: { text, language, segments }
-    """
     loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(None, _transcribe_sync, audio_path)
     return result

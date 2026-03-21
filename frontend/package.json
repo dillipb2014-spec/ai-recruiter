@@ -4,16 +4,20 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "postinstall": "prisma generate --config ../prisma.config.ts"
   },
   "dependencies": {
     "next": "^16.1.6",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "@prisma/client": "^7.5.0"
   },
   "devDependencies": {
     "@types/node": "25.5.0",
     "@types/react": "19.2.14",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "@prisma/config": "^7.5.0",
+    "prisma": "^7.5.0"
   }
 }
