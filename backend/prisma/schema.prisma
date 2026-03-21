@@ -3,9 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  // URLs are now managed in prisma.config.ts to avoid P1012 errors
 }
 
 model Candidate {
@@ -23,7 +22,7 @@ model Candidate {
   linkedInUrl        String?
   openToRelocation   Boolean  @default(false)
   resumeLink         String
-  status             String   @default("UPLOADED") // UPLOADED, PENDING, SCREEN_SELECT, SCREEN_REJECT
+  status             String   @default("UPLOADED") 
   suitabilityScore   Float?
   aiRemarks          String?  @db.Text
   createdAt          DateTime @default(now())
