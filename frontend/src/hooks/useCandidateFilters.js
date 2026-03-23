@@ -69,19 +69,24 @@ function toParams(f) {
 // Convert filter state to API query params
 function toApiParams(f) {
   const p = {};
-  if (f.geniusMatch)           { p.score_min = 85; p.score_max = 100; }
-  else {
-    if (f.scoreMin > 0)   p.score_min = f.scoreMin;
-    if (f.scoreMax < 100) p.score_max = f.scoreMax;
+  if (f.geniusMatch) {
+    p.score_min = 85;
+    p.score_max = 100;
+  } else {
+    // Always send both bounds together so the backend range is unambiguous
+    if (f.scoreMin > 0 || f.scoreMax < 100) {
+      p.score_min = f.scoreMin;
+      p.score_max = f.scoreMax;
+    }
   }
-  if (f.search)                p.search        = f.search;
-  if (f.status.length)         p.status        = f.status.join(",");
-  if (f.skills.length)         p.skills        = f.skills.join(",");
-  if (f.proficiency.length)    p.proficiency   = f.proficiency.join(",");
-  if (f.expBucket.length)      p.exp_bucket    = f.expBucket.join(",");
-  if (f.source.length)         p.source        = f.source.join(",");
-  if (f.timeline)              p.timeline      = f.timeline;
-  if (f.noticePeriod.length)   p.notice_period = f.noticePeriod.join(",");
+  if (f.search)              p.search        = f.search;
+  if (f.status.length)       p.status        = f.status.join(",");
+  if (f.skills.length)       p.skills        = f.skills.join(",");
+  if (f.proficiency.length)  p.proficiency   = f.proficiency.join(",");
+  if (f.expBucket.length)    p.exp_bucket    = f.expBucket.join(",");
+  if (f.source.length)       p.source        = f.source.join(",");
+  if (f.timeline)            p.timeline      = f.timeline;
+  if (f.noticePeriod.length) p.notice_period = f.noticePeriod.join(",");
   p.sort  = f.sort;
   p.order = f.order;
   return p;

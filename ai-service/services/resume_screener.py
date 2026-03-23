@@ -50,6 +50,7 @@ async def screen_resume(
     job_description: str = "",
     key_points: list[str] = None,
     screening_params: dict = None,
+    candidate_details: dict = None,
 ) -> dict:
     text      = _sanitize(resume_text)
     job_title = _sanitize(job_title, 200)
@@ -73,6 +74,29 @@ async def screen_resume(
     kp_weight     /= total_w
     ai_weight     /= total_w
 
+    # Build validated-fields block from DB so LLM won't flag known values as missing
+    validated_lines = []
+    if candidate_details:
+        if candidate_details.get("current_ctc") not in (None, "", 0):
+            validated_lines.append(f"- currentCTC = {candidate_details['current_ctc']} LPA (confirmed, do NOT flag as missing)")
+        if candidate_details.get("expected_ctc") not in (None, "", 0):
+            validated_lines.append(f"- expectedCTC = {candidate_details['expected_ctc']} LPA (confirmed, do NOT flag as missing)")
+        if candidate_details.get("notice_period"):
+            validated_lines.append(f"- noticePeriod = {candidate_details['notice_period']} (confirmed)")
+        if candidate_details.get("experience_years") not in (None, ""):
+            validated_lines.append(f"- yearsExperience = {candidate_details['experience_years']} years (confirmed)")
+    validated_block = (
+        "\n\nVALIDATED CANDIDATE FIELDS (already confirmed in our system — do NOT list these as weaknesses or areas to improve):\n"
+        + "\n".join(validated_lines)
+        + "\nCRITICAL: If expectedCTC or currentCTC is listed above, salary expectations are NOT unclear and must NOT appear in weaknesses.\n"
+    ) if validated_lines else ""
+
+    # Build screening questions block
+    questions_block = ""
+    if key_points:
+        questions_block = "\n\nSCREENING QUESTIONS (evaluate candidate against each, score 0-10):\n" + \
+            "\n".join(f"{i+1}. {q}" for i, q in enumerate(key_points))
+
     prompt = f"""You are a specialized Data Extraction Engine. Your goal is to parse the provided Resume text and return a valid JSON object.
 
 Fields to Extract:
@@ -88,33 +112,38 @@ Fields to Extract:
 - ai_recommendation: 'hire' if score >= 75, 'hold' if 50-74, 'reject' if score < 50.
 - linkedin_url: Full LinkedIn profile URL found in the resume, or empty string.
 - decision_insight: Exactly 1 sentence. Start with 'Pro:' if score >= 50 highlighting their strongest technical asset. Start with 'Con:' if score < 50 stating the primary mismatch (Tech Stack, Experience, or Relocation).
+- question_scores: For EACH screening question listed below, return an object with: index (1-based int), question (exact question text), score (float 0-10 based on how well the resume addresses it), answer (1-2 sentences summarising evidence from the resume). Return [] only if there are no screening questions.
 
 Constraint: Return ONLY the JSON object. Do not include any introductory text or explanations.
 
 ### JOB DESCRIPTION (The Standard):
-{jd_text or "Not provided."}
-
+{jd_text or "Not provided."}{questions_block}
+{validated_block}
 ### RESUME TEXT (The Candidate):
 {text}
 
 ### TASK:
 Extract current_company, total_experience, current_ctc, expected_ctc and evaluate the skillset against the JD above.
 Provide the suitability_score and decision_insight.
+For question_scores, score EVERY screening question listed above — do not skip any.
 Output JSON only.
 
 {{
   "current_company": "<most recent employer>",
-  "total_experience": <number or 0>,
-  "current_ctc": <number in LPA or null>,
-  "expected_ctc": <number in LPA or null>,
-  "skillset_valuation": ["<skill1>", "<skill2>", "<skill3>", "<skill4>", "<skill5>"],
-  "suitability_score": <0-100>,
+  "total_experience": 0,
+  "current_ctc": null,
+  "expected_ctc": null,
+  "skillset_valuation": ["skill1", "skill2", "skill3"],
+  "suitability_score": 75,
   "ai_summary": "<fit summary>",
-  "strengths": ["<strength1>", "<strength2>"],
-  "weaknesses": ["<gap1>"],
-  "ai_recommendation": "<hire|hold|reject>",
-  "linkedin_url": "<url or empty string>",
-  "decision_insight": "<Pro: ... or Con: ...>"
+  "strengths": ["strength1", "strength2"],
+  "weaknesses": ["gap1"],
+  "ai_recommendation": "hire",
+  "linkedin_url": "",
+  "decision_insight": "Pro: ...",
+  "question_scores": [
+    {{"index": 1, "question": "<question text>", "score": 8.0, "answer": "<how resume addresses this>"}}
+  ]
 }}"""
 
     raw = await ollama_generate(prompt)
@@ -193,6 +222,7 @@ Output JSON only.
         "linkedin_url":      linkedin_url,
         "decision_insight":  raw_insight,
         "exp_flag":          exp_flag,
+        "question_scores":   data.get("question_scores", []),
         "score_breakdown": {
             "keyword":    kw_s,
             "design":     design_s,

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import ScoreBadge from "@/components/ScoreBadge";
 import CandidateDrawer from "@/components/CandidateDrawer";
 import JobRolesModal from "@/components/JobRolesModal";
@@ -9,7 +9,7 @@ import {
   fetchCandidates, fetchJobRoles,
   bulkUploadCandidates, getBulkUploadStatus,
   bulkUpdateStatus, sendRejectionEmails,
-  triggerBulkScan, getBulkScanStatus, sendScreeningTest,
+  sendScreeningTest,
 } from "@/lib/api";
 
 const STATUS_STYLE = {
@@ -43,11 +43,6 @@ function DashboardInner() {
   const [selected, setSelected]       = useState(null);
   const [showRoles, setShowRoles]     = useState(false);
 
-  // Bulk re-scan
-  const [scanConfirm, setScanConfirm]   = useState(false);
-  const [scanState, setScanState]       = useState(null); // null | { total, pending, done, msg }
-  const scanPollRef                     = useRef(null);
-
   // Selection for bulk ops
   const [checkedIds, setCheckedIds]   = useState(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -67,6 +62,7 @@ function DashboardInner() {
       const data = await fetchCandidates(apiParams);
       setCandidates(data);
       setTotalCount(data.length);
+      setSelected(prev => prev ? (data.find(c => c.id === prev.id) ?? prev) : null);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }, [apiParams]);
@@ -78,35 +74,19 @@ function DashboardInner() {
 
   useEffect(() => { fetchJobRoles().then(setRoles).catch(() => {}); }, []);
 
-  async function startBulkScan() {
-    setScanConfirm(false);
-    try {
-      const { total, candidates: ids } = await triggerBulkScan();
-      if (total === 0) { setScanState({ total: 0, pending: 0, done: 0, msg: "No candidates with resumes found" }); return; }
-      setScanState({ total, pending: total, done: 0, msg: `Scanning\u2026 0/${total}` });
-      scanPollRef.current = setInterval(async () => {
-        try {
-          const st = await getBulkScanStatus();
-          const pending = parseInt(st.pending, 10);
-          const done    = total - pending;
-          if (pending === 0) {
-            clearInterval(scanPollRef.current);
-            setScanState({ total, pending: 0, done: total, msg: "\u2705 Scan complete" });
-            load();
-            setTimeout(() => setScanState(null), 4000);
-          } else {
-            setScanState({ total, pending, done, msg: `Scanning\u2026 ${done}/${total}` });
-          }
-        } catch { clearInterval(scanPollRef.current); }
-      }, 3000);
-      setTimeout(() => {
-        clearInterval(scanPollRef.current);
-        setScanState((s) => s && s.pending > 0 ? { ...s, msg: "\u26a0 Timed out \u2014 check results" } : s);
-      }, 600000);
-    } catch (err) {
-      setScanState({ total: 0, pending: 0, done: 0, msg: `\u26a0 ${err.message}` });
-    }
-  }
+  // Poll while any visible candidate (or open drawer) is in "screening" state
+  useEffect(() => {
+    const hasScreening = selected?.status === "screening" || candidates.some(c => c.status === "screening");
+    if (!hasScreening) return;
+    const t = setInterval(() => {
+      fetchCandidates(apiParams).then(data => {
+        setCandidates(data);
+        setTotalCount(data.length);
+        setSelected(prev => prev ? (data.find(c => c.id === prev.id) ?? prev) : null);
+      }).catch(() => {});
+    }, 4000);
+    return () => clearInterval(t);
+  }, [selected?.status, candidates, apiParams]);
 
   // Sort helpers
   function toggleSort(col) {
@@ -207,13 +187,6 @@ function DashboardInner() {
             <p style={s.subtitle}>Recruiter Control Center</p>
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <button
-              onClick={() => setScanConfirm(true)}
-              disabled={!!scanState}
-              style={{ ...s.btnSecondary, opacity: scanState ? 0.5 : 1 }}
-            >
-              🔄 Re-scan All
-            </button>
             <a href="/reports" style={s.btnSecondary}>📊 Reports</a>
             <button onClick={() => setShowRoles(true)} style={s.btnPrimary}>+ Job Roles</button>
           </div>
@@ -326,7 +299,7 @@ function DashboardInner() {
                       <td style={s.td} onClick={(e) => e.stopPropagation()}>
                         <input type="checkbox" checked={checked} onChange={() => toggleOne(c.id)} />
                       </td>
-                      <td style={{ ...s.td, fontWeight: 600, color: "#111827" }}>
+                      <td style={{ ...s.td, fontWeight: 600, color: "#111827", fontFamily: FONT }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                           {c.full_name}
                           {c.linkedin_url && c.linkedin_url.includes("linkedin.com") && (
@@ -340,9 +313,9 @@ function DashboardInner() {
                             </a>
                           )}
                         </div>
-                        <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 400 }}>{c.email}</div>
+                        <div style={{ fontSize: 11, color: "#666666", fontWeight: 400, fontFamily: FONT }}>{c.email}</div>
                       </td>
-                      <td style={{ ...s.td, color: "#6b7280", fontSize: 12 }}>{c.current_company || "—"}</td>
+                      <td style={{ ...s.td, color: "#666666", fontSize: 12, fontWeight: 400, fontFamily: FONT }}>{c.current_company || "—"}</td>
                       <td style={{ ...s.td, color: "#6b7280" }}>{c.job_role_title || "—"}</td>
                       <td style={s.td}>
                         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -355,7 +328,11 @@ function DashboardInner() {
                           </span>
                           {c.status === "uploaded" && (
                             <button
-                              onClick={(e) => { e.stopPropagation(); sendScreeningTest(c.id).then(load).catch(() => {}); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCandidates(prev => prev.map(x => x.id === c.id ? { ...x, status: "screening" } : x));
+                                sendScreeningTest(c.id).then(load).catch(() => load());
+                              }}
                               style={{ padding: "3px 8px", fontSize: 10, fontWeight: 600, background: "#0052cc", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", whiteSpace: "nowrap" }}
                             >▶ Send Screening Test</button>
                           )}
@@ -395,43 +372,6 @@ function DashboardInner() {
       <CandidateDrawer candidate={selected} onClose={() => setSelected(null)} onRescreen={load} />
       {showRoles && <JobRolesModal onClose={() => { setShowRoles(false); fetchJobRoles().then(setRoles).catch(() => {}); }} />}
 
-      {/* ── Confirm Modal ── */}
-      {scanConfirm && (
-        <>
-          <div onClick={() => setScanConfirm(false)} style={s.overlay} />
-          <div style={s.modal}>
-            <h3 style={{ margin: "0 0 10px", fontSize: 16, fontWeight: 700, color: "#111827" }}>Re-scan All Candidates?</h3>
-            <p style={{ margin: "0 0 20px", fontSize: 13, color: "#6b7280", lineHeight: 1.6 }}>
-              This will re-scan <strong>{candidates.length}</strong> candidate{candidates.length !== 1 ? "s" : ""} using the current JD and Ollama AI.
-              This may take a few minutes. Proceed?
-            </p>
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button onClick={() => setScanConfirm(false)} style={s.btnGhost}>Cancel</button>
-              <button onClick={startBulkScan} style={s.btnPrimary}>Yes, Re-scan</button>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ── Progress Toast ── */}
-      {scanState && (
-        <div style={s.toast}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{scanState.msg}</span>
-            {scanState.pending === 0 && (
-              <button onClick={() => setScanState(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#6b7280" }}>✕</button>
-            )}
-          </div>
-          {scanState.total > 0 && (
-            <div style={{ height: 4, background: "#e5e7eb", borderRadius: 999, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${Math.round((scanState.done / scanState.total) * 100)}%`, background: "#0052cc", borderRadius: 999, transition: "width 0.4s ease" }} />
-            </div>
-          )}
-          {scanState.total > 0 && (
-            <p style={{ margin: "4px 0 0", fontSize: 11, color: "#9ca3af" }}>{scanState.done} of {scanState.total} processed</p>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -444,49 +384,49 @@ export default function DashboardPage() {
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
+const FONT = "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 const s = {
-  shell:       { display: "flex", height: "100vh", overflow: "hidden", background: "#f9fafb" },
-  main:        { flex: 1, padding: "24px 32px", minWidth: 0, overflowY: "auto", overflowX: "hidden" },
+  shell:       { display: "flex", height: "100vh", overflow: "hidden", background: "#f9fafb", fontFamily: FONT },
+  main:        { flex: 1, padding: "24px 32px", minWidth: 0, overflowY: "auto", overflowX: "hidden", fontFamily: FONT },
   topbar:      { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
-  title:       { margin: 0, fontSize: 22, fontWeight: 700, color: "#111827" },
+  title:       { margin: 0, fontSize: 22, fontWeight: 700, color: "#111827", fontFamily: FONT },
   titleAccent: { color: "#0052cc" },
-  subtitle:    { margin: "2px 0 0", fontSize: 12, color: "#9ca3af" },
+  subtitle:    { margin: "2px 0 0", fontSize: 12, color: "#9ca3af", fontFamily: FONT },
   card:        { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 18px", marginBottom: 16 },
-  cardLabel:   { margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.08em" },
+  cardLabel:   { margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.08em", fontFamily: FONT },
   flexRow:     { display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" },
   row:         { display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" },
-  select:      { padding: "7px 12px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, background: "#fff", cursor: "pointer", minWidth: 180 },
-  fileLabel:   { padding: "7px 14px", border: "1px dashed #d1d5db", borderRadius: 7, fontSize: 12, color: "#6b7280", cursor: "pointer", background: "#fafafa" },
+  select:      { padding: "7px 12px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, background: "#fff", cursor: "pointer", minWidth: 180, fontFamily: FONT },
+  fileLabel:   { padding: "7px 14px", border: "1px dashed #d1d5db", borderRadius: 7, fontSize: 12, color: "#6b7280", cursor: "pointer", background: "#fafafa", fontFamily: FONT },
   errText:     { margin: "8px 0 0", fontSize: 12, color: "#dc2626" },
   okText:      { margin: "8px 0 0", fontSize: 12, color: "#16a34a" },
-  hintText:    { margin: "6px 0 0", fontSize: 11, color: "#9ca3af" },
+  hintText:    { margin: "6px 0 0", fontSize: 11, color: "#9ca3af", fontFamily: FONT },
   pillsRow:    { display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginBottom: 12 },
-  pillsLabel:  { fontSize: 12, color: "#6b7280", fontWeight: 500 },
-  pill:        { display: "inline-flex", alignItems: "center", gap: 4, background: "#e6f0ff", color: "#0052cc", fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 999 },
+  pillsLabel:  { fontSize: 12, color: "#6b7280", fontWeight: 500, fontFamily: FONT },
+  pill:        { display: "inline-flex", alignItems: "center", gap: 4, background: "#e6f0ff", color: "#0052cc", fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 999, fontFamily: FONT },
   pillX:       { background: "none", border: "none", cursor: "pointer", color: "#0052cc", fontSize: 11, padding: 0, lineHeight: 1 },
-  clearAll:    { fontSize: 11, color: "#9ca3af", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" },
+  clearAll:    { fontSize: 11, color: "#9ca3af", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", fontFamily: FONT },
   tableHeader: { marginBottom: 12 },
-  searchInput: { padding: "8px 14px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, width: 280, outline: "none" },
-  counter:     { fontSize: 13, color: "#6b7280", marginLeft: "auto" },
+  searchInput: { padding: "8px 14px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, width: 280, outline: "none", fontFamily: FONT },
+  counter:     { fontSize: 13, color: "#6b7280", marginLeft: "auto", fontFamily: FONT },
   bulkBar:     { display: "flex", gap: 8, alignItems: "center", marginTop: 10, padding: "10px 14px", background: "#fffbeb", border: "1px solid #fef3c7", borderRadius: 8 },
-  bulkCount:   { fontSize: 13, fontWeight: 600, color: "#92400e" },
-  btnPrimary:  { padding: "8px 18px", background: "#0052cc", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: "pointer" },
-  btnSecondary:{ padding: "7px 14px", background: "#f3f4f6", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center" },
-  btnDanger:   { padding: "7px 14px", background: "#fee2e2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: "pointer" },
-  btnGhost:    { padding: "7px 14px", background: "none", color: "#6b7280", border: "none", fontSize: 13, cursor: "pointer" },
+  bulkCount:   { fontSize: 13, fontWeight: 600, color: "#92400e", fontFamily: FONT },
+  btnPrimary:  { padding: "8px 18px", background: "#0052cc", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
+  btnSecondary:{ padding: "7px 14px", background: "#f3f4f6", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center", fontFamily: FONT },
+  btnDanger:   { padding: "7px 14px", background: "#fee2e2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
+  btnGhost:    { padding: "7px 14px", background: "none", color: "#6b7280", border: "none", fontSize: 13, cursor: "pointer", fontFamily: FONT },
   tableWrap:   { overflowX: "auto", borderRadius: 10, boxShadow: "0 1px 3px rgba(0,0,0,0.06)", background: "#fff", border: "1px solid #e5e7eb", marginBottom: 32 },
-  table:       { width: "100%", borderCollapse: "collapse" },
+  table:       { width: "100%", borderCollapse: "collapse", fontFamily: FONT },
   thead:       { background: "#f3f4f6" },
-  th:          { padding: "10px 14px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em", cursor: "pointer", whiteSpace: "nowrap", userSelect: "none" },
-  td:          { padding: "12px 14px", fontSize: 13, borderTop: "1px solid #f3f4f6", verticalAlign: "middle" },
+  th:          { padding: "10px 14px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em", cursor: "pointer", whiteSpace: "nowrap", userSelect: "none", fontFamily: FONT },
+  td:          { padding: "12px 14px", fontSize: 13, borderTop: "1px solid #f3f4f6", verticalAlign: "middle", fontFamily: FONT },
   trEven:      { background: "#fff" },
   trOdd:       { background: "#f9fafb" },
   trChecked:   { background: "#eff6ff" },
-  statusPill:  { fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap" },
-  errorBox:    { background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "12px 16px", color: "#dc2626", marginBottom: 14, fontSize: 13 },
-  empty:       { textAlign: "center", padding: 60, color: "#9ca3af", fontSize: 14 },
+  statusPill:  { fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap", fontFamily: FONT },
+  errorBox:    { background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "12px 16px", color: "#dc2626", marginBottom: 14, fontSize: 13, fontFamily: FONT },
+  empty:       { textAlign: "center", padding: 60, color: "#9ca3af", fontSize: 14, fontFamily: FONT },
   overlay:     { position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 60 },
-  modal:       { position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", background: "#fff", borderRadius: 12, padding: "24px 28px", width: 400, zIndex: 70, boxShadow: "0 8px 32px rgba(0,0,0,0.18)" },
-  toast:       { position: "fixed", bottom: 24, right: 24, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 18px", width: 280, zIndex: 80, boxShadow: "0 4px 16px rgba(0,0,0,0.12)" },
+  modal:       { position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", background: "#fff", borderRadius: 12, padding: "24px 28px", width: 400, zIndex: 70, boxShadow: "0 8px 32px rgba(0,0,0,0.18)", fontFamily: FONT },
+  toast:       { position: "fixed", bottom: 24, right: 24, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 18px", width: 280, zIndex: 80, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", fontFamily: FONT },
 };

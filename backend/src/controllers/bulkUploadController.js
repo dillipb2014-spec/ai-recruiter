@@ -114,33 +114,19 @@ async function processBulkRows(bulkId, rows, roleId, jobTitle) {
 
       if (!full_name || !email) { failed++; continue; }
 
-      // Upsert candidate — save as 'uploaded', no AI screening yet
-      let candidateId;
-      const existing = await db.query("SELECT id FROM candidates WHERE email = $1", [email]);
-      if (existing.rows.length) {
-        candidateId = existing.rows[0].id;
-        await db.query(
-          `UPDATE candidates SET job_role_id=$1, status='uploaded',
-           current_company=$2, current_ctc=$3, expected_ctc=$4,
-           linkedin_url=$5, notice_period=$6, relocation_ready=$7
-           WHERE id=$8`,
-          [roleId, currentCompany||null, currentCTC, expectedCTC,
-           linkedInUrl, noticePeriod||null, openToRelocation, candidateId]
-        );
-      } else {
-        const cResult = await db.query(
-          `INSERT INTO candidates
-             (full_name, email, phone, job_role_id, status,
-              current_company, current_ctc, expected_ctc,
-              linkedin_url, notice_period, relocation_ready)
-           VALUES ($1,$2,$3,$4,'uploaded',$5,$6,$7,$8,$9,$10)
-           RETURNING id`,
-          [full_name, email, phone||null, roleId,
-           currentCompany||null, currentCTC, expectedCTC,
-           linkedInUrl, noticePeriod||null, openToRelocation]
-        );
-        candidateId = cResult.rows[0].id;
-      }
+      // Always insert — duplicate emails create new candidates
+      const cResult = await db.query(
+        `INSERT INTO candidates
+           (full_name, email, phone, job_role_id, status,
+            current_company, current_ctc, expected_ctc,
+            linkedin_url, notice_period, relocation_ready)
+         VALUES ($1,$2,$3,$4,'uploaded',$5,$6,$7,$8,$9,$10)
+         RETURNING id`,
+        [full_name, email, phone||null, roleId,
+         currentCompany||null, currentCTC, expectedCTC,
+         linkedInUrl, noticePeriod||null, openToRelocation]
+      );
+      const candidateId = cResult.rows[0].id;
 
       // Download and store resume — recruiter triggers AI later
       if (resumeLink) {

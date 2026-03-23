@@ -198,28 +198,13 @@ export async function getBulkUploadStatus(bulkId) {
 }
 
 export async function sendScreeningTest(candidateId) {
+  const csrfToken = await getCsrfToken();
   const res = await fetch(apiUrl(`/api/admin/send-screening/${encodeURIComponent(candidateId)}`), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
     credentials: "include",
   });
   if (!res.ok) throw new Error((await res.json()).error || "Failed to trigger screening");
-  return res.json();
-}
-
-export async function triggerBulkScan() {
-  const res = await fetch(apiUrl("/api/admin/bulk-scan"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-  });
-  if (!res.ok) throw new Error((await res.json()).error || "Bulk scan failed");
-  return res.json();
-}
-
-export async function getBulkScanStatus() {
-  const res = await fetch(apiUrl("/api/admin/bulk-scan/status"), { credentials: "include" });
-  if (!res.ok) throw new Error("Failed to fetch scan status");
   return res.json();
 }
 

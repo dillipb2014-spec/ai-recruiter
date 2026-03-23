@@ -45,7 +45,9 @@ async def screen_resume_endpoint(req: ScreenRequest):
         row = await pool.fetchrow(
             """SELECT jr.title, jr.original_jd_text,
                       jr.key_points, jr.screening_params, jr.mandatory_skills,
-                      c.id AS candidate_id
+                      c.id AS candidate_id,
+                      c.current_ctc, c.expected_ctc, c.notice_period,
+                      r.experience_years
                FROM resumes r
                JOIN candidates c ON c.id = r.candidate_id
                LEFT JOIN job_roles jr ON jr.id = c.job_role_id
@@ -59,6 +61,13 @@ async def screen_resume_endpoint(req: ScreenRequest):
             if row["screening_params"]:
                 sp = row["screening_params"]
                 screening_params = sp if isinstance(sp, dict) else json.loads(sp)
+
+        candidate_details = {
+            "current_ctc":      row["current_ctc"]      if row else None,
+            "expected_ctc":     row["expected_ctc"]     if row else None,
+            "notice_period":    row["notice_period"]    if row else None,
+            "experience_years": row["experience_years"] if row else None,
+        } if row else None
 
         # Parse key_points from DB
         key_points = []
@@ -105,6 +114,7 @@ async def screen_resume_endpoint(req: ScreenRequest):
             job_description=job_description,
             key_points=key_points,
             screening_params=screening_params,
+            candidate_details=candidate_details,
         )
 
         await pool.execute(
@@ -139,10 +149,10 @@ async def screen_resume_endpoint(req: ScreenRequest):
 
         if not candidate_id:
             print(f"WARNING: No candidate_id for resume {req.resume_id} — skipping candidate update")
-        elif cur_status == "uploaded":
-            # Resume updated but screening not yet triggered — keep as uploaded
-            print(f"Candidate {candidate_id} is 'uploaded', keeping status unchanged after resume update")
-            new_status = "uploaded"
+        elif cur_status in ("uploaded", "applied"):
+            # Resume scored but screening not yet triggered — keep status as-is
+            print(f"Candidate {candidate_id} is '{cur_status}', keeping status unchanged after resume score")
+            new_status = cur_status
             await pool.execute(
                 "UPDATE candidates SET ai_decision_insight = $1 WHERE id = $2",
                 result.get("decision_insight") or None, candidate_id,
@@ -181,20 +191,22 @@ async def screen_resume_endpoint(req: ScreenRequest):
             await pool.execute(
                 """INSERT INTO evaluation_scores
                      (candidate_id, resume_score, strengths, weaknesses,
-                      ai_feedback, ai_recommendation)
-                   VALUES ($1, $2, $3, $4, $5, $6)
+                      ai_feedback, ai_recommendation, question_scores)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7)
                    ON CONFLICT (candidate_id) DO UPDATE SET
                      resume_score      = EXCLUDED.resume_score,
                      strengths         = EXCLUDED.strengths,
                      weaknesses        = EXCLUDED.weaknesses,
                      ai_feedback       = EXCLUDED.ai_feedback,
-                     ai_recommendation = EXCLUDED.ai_recommendation""",
+                     ai_recommendation = EXCLUDED.ai_recommendation,
+                     question_scores   = EXCLUDED.question_scores""",
                 candidate_id,
                 result["ai_score"],
                 json.dumps(result.get("strengths", [])),
                 json.dumps(result.get("weaknesses", [])),
                 result["ai_summary"],
                 result.get("ai_recommendation", "hold"),
+                json.dumps(result.get("question_scores", [])),
             )
 
         return {

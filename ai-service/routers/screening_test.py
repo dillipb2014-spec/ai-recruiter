@@ -134,7 +134,7 @@ async def evaluate_screening_test(candidate_id: str, req: EvaluateRequest):
 
     job_title   = row["title"] or "Software Engineer"
     jd_text     = _sanitize(row["original_jd_text"] or "", 1500)
-    resume_score = float(row["resume_score"] or 0)
+    resume_score_final = float(row["resume_score"] or 0)
 
     mandatory = row["mandatory_skills"] or []
     if isinstance(mandatory, str):
@@ -156,17 +156,22 @@ CANDIDATE ANSWERS:
 {qa_text}
 
 Scoring rules:
-- Resume score is worth 50 points, Screening test is worth 50 points (Total 100).
-- Evaluate the screening test answers on technical accuracy, relevance to JD, and depth.
-- If combined score >= 50, decision must be "SCREEN SELECT".
-- If combined score < 50, decision must be "SCREEN REJECT".
-- Provide clear reasoning for your decision.
+- Score each answer out of 10. total_score = sum of all 5 scores (max 100).
+- Do NOT reference resume score.
+- If total_score >= 50 → decision = "SCREEN SELECT", else "SCREEN REJECT".
 
 Respond with ONLY this JSON:
 {{
-  "total_score": <0-100>,
+  "total_score": <0-100 integer>,
   "decision": "SCREEN SELECT" | "SCREEN REJECT",
-  "reasoning": "<clear explanation of the decision>"
+  "question_scores": [
+    {{"index": 1, "score": <0-10>, "question": "<question text>", "answer": "<one sentence eval of the answer>"}},
+    {{"index": 2, "score": <0-10>, "question": "<question text>", "answer": "<one sentence eval of the answer>"}},
+    {{"index": 3, "score": <0-10>, "question": "<question text>", "answer": "<one sentence eval of the answer>"}},
+    {{"index": 4, "score": <0-10>, "question": "<question text>", "answer": "<one sentence eval of the answer>"}},
+    {{"index": 5, "score": <0-10>, "question": "<question text>", "answer": "<one sentence eval of the answer>"}}
+  ],
+  "summary": "<one sentence overall summary>"
 }}"""
 
     try:
@@ -178,40 +183,58 @@ Respond with ONLY this JSON:
         data = {}
 
     ai_total_score = max(0.0, min(100.0, float(data.get("total_score", 50))))
-    ai_decision = data.get("decision", "SCREEN REJECT")
-    ai_reasoning = str(data.get("reasoning", ""))
+    per_q = data.get("question_scores", [])
+    # Merge actual candidate answers into per_q
+    for i, qa in enumerate(req.answers):
+        if i < len(per_q):
+            per_q[i]["candidate_answer"] = qa.get("answer", "")
+    # Fallback: build from req.answers if LLM didn't return question_scores
+    if not per_q:
+        per_q = [{"index": i+1, "score": round(ai_total_score/5, 1), "question": qa["question"], "answer": "", "candidate_answer": qa.get("answer", "")} for i, qa in enumerate(req.answers)]
+    ai_reasoning = data.get("summary", "") or str(data.get("reasoning", "")).replace("/50", "/100")
 
-    resume_score_final = float(resume_score or 0)
     screening_score_final = ai_total_score
-    
-    final_score = round((resume_score_final + screening_score_final) / 2, 1)
+
+    # Step 1: Add Resume + Screening. Step 2: Divide by 2.
+    final_score = round((resume_score_final + screening_score_final) / 2, 2)
 
     if final_score >= 50:
         new_status = "screen_select"
         recommendation = "hire"
+        verdict = "Recommended"
     else:
         new_status = "screen_reject"
         recommendation = "reject"
+        verdict = "Not Recommended"
+
+    warning = (
+        " Note: Candidate's theoretical experience significantly outweighs test performance."
+        if (resume_score_final - screening_score_final) > 20 else ""
+    )
+
+    insight = f"Final Suitability Score: {final_score:.2f}% ({verdict})"
 
     # Persist to evaluation_scores
     await pool.execute(
         """INSERT INTO evaluation_scores
-             (candidate_id, resume_score, overall_score, ai_feedback, ai_recommendation)
-           VALUES ($1, $2, $3, $4, $5)
+             (candidate_id, resume_score, overall_score, ai_feedback, ai_recommendation, question_scores)
+           VALUES ($1, $2, $3, $4, $5, $6)
            ON CONFLICT (candidate_id) DO UPDATE SET
              overall_score     = EXCLUDED.overall_score,
              ai_feedback       = EXCLUDED.ai_feedback,
-             ai_recommendation = EXCLUDED.ai_recommendation""",
+             ai_recommendation = EXCLUDED.ai_recommendation,
+             question_scores   = EXCLUDED.question_scores""",
         candidate_id,
         resume_score_final,
         final_score,
         ai_reasoning,
         recommendation,
+        json.dumps(per_q),
     )
 
     await pool.execute(
         "UPDATE candidates SET status = $1, ai_decision_insight = $2 WHERE id = $3",
-        new_status, ai_reasoning, candidate_id,
+        new_status, insight, candidate_id,
     )
 
     return {

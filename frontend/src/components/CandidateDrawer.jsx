@@ -35,11 +35,11 @@ const STATUS_LABEL = {
 export default function CandidateDrawer({ candidate, onClose, onRescreen }) {
   if (!candidate) return null;
 
-  const [uploading, setUploading]   = useState(false);
-  const [uploadMsg, setUploadMsg]   = useState("");
-  const [screening, setScreening]   = useState(false);
+  const [uploading, setUploading]         = useState(false);
+  const [uploadMsg, setUploadMsg]         = useState("");
+  const [screening, setScreening]         = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-  const fileRef                     = useRef();
+  const fileRef                           = useRef();
 
   async function handleAction(status) {
     setActionLoading(true);
@@ -60,10 +60,9 @@ export default function CandidateDrawer({ candidate, onClose, onRescreen }) {
       setUploadMsg("✅ Resume uploaded — AI screening in progress…");
       setScreening(true);
       onRescreen?.();
-      // Poll until screening completes
       const poll = setInterval(async () => {
         try {
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/api/candidates/${candidate.id}`, { credentials: "include" });
+          const res  = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/api/candidates/${candidate.id}`, { credentials: "include" });
           const data = await res.json();
           if (data.screening_status === "completed" || data.screening_status === "failed") {
             clearInterval(poll);
@@ -82,12 +81,12 @@ export default function CandidateDrawer({ candidate, onClose, onRescreen }) {
     }
   }
 
-  const score  = parseFloat(candidate.overall_score ?? candidate.resume_score ?? 0);
-  const rec     = candidate.status === "screen_select" ? null
-                : score >= 75 ? "hire"
-                : score < 50  ? "reject"
-                : null;
-  const recBg   = rec === "hire" ? "#16a34a" : "#dc2626";
+  const score = parseFloat(candidate.overall_score ?? candidate.resume_score ?? 0);
+  const rec   = candidate.status === "screen_select" ? null
+              : score >= 75 ? "hire"
+              : score < 50  ? "reject"
+              : null;
+  const recBg = rec === "hire" ? "#16a34a" : "#dc2626";
   const status = STATUS_COLOR[candidate.status] || { bg: "#f3f4f6", color: "#374151" };
 
   let skills = [];
@@ -102,8 +101,12 @@ export default function CandidateDrawer({ candidate, onClose, onRescreen }) {
   try { weaknesses = Array.isArray(candidate.weaknesses) ? candidate.weaknesses : JSON.parse(candidate.weaknesses || "[]"); }
   catch { weaknesses = []; }
 
-  const resumeScore    = parseFloat(candidate.resume_score   ?? 0);
-  const screeningScore = parseFloat(candidate.overall_score  ?? candidate.screening_score ?? 0);
+  const resumeScore    = parseFloat(candidate.resume_score  ?? 0);
+  const screeningScore = parseFloat(candidate.overall_score ?? candidate.screening_score ?? 0);
+
+  let questionScores = [];
+  try { questionScores = Array.isArray(candidate.question_scores) ? candidate.question_scores : JSON.parse(candidate.question_scores || "[]"); }
+  catch { questionScores = []; }
 
   return (
     <>
@@ -115,7 +118,23 @@ export default function CandidateDrawer({ candidate, onClose, onRescreen }) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2 style={st.name}>{candidate.full_name}</h2>
             <p style={st.meta}>{candidate.email}</p>
-            {candidate.phone && <p style={st.meta}>{candidate.phone}</p>}
+            {candidate.phone && (
+              <p style={{ ...st.meta, display: "flex", alignItems: "center", gap: 6 }}>
+                {candidate.phone}
+                <a
+                  href={`https://web.whatsapp.com/send?phone=${candidate.phone.replace(/\D/g, "")}&text=${encodeURIComponent(`Hi ${candidate.full_name}, this is regarding your application for the ${candidate.job_role_title || "open"} position at Juspay. We'd like to connect with you.`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  title="Message on WhatsApp"
+                  style={st.waBtn}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="#25D366">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/>
+                  </svg>
+                </a>
+              </p>
+            )}
             {candidate.job_role_title && (
               <p style={{ ...st.meta, color: "#0052cc", fontWeight: 500 }}>
                 {candidate.job_role_title}
@@ -142,7 +161,7 @@ export default function CandidateDrawer({ candidate, onClose, onRescreen }) {
           )}
         </div>
 
-        {/* Score */}
+        {/* Score bars */}
         <div style={st.section}>
           <p style={st.sectionTitle}>SUITABILITY MATCH</p>
           {[
@@ -165,7 +184,7 @@ export default function CandidateDrawer({ candidate, onClose, onRescreen }) {
           })}
         </div>
 
-        {/* ── AI Decision Insight card — always first in body ── */}
+        {/* AI Decision Insight */}
         {candidate.ai_decision_insight ? (
           <div style={st.insightCard}>
             <p style={st.insightLabel}>✦ AI DECISION INSIGHT</p>
@@ -179,6 +198,43 @@ export default function CandidateDrawer({ candidate, onClose, onRescreen }) {
             </p>
           </div>
         ) : null}
+
+        {/* Screening Test Ratings */}
+        {questionScores.length > 0 && candidate.overall_score != null && ["screen_select","screen_reject","interview","evaluated","hired","rejected"].includes(candidate.status) && (
+          <div style={st.section}>
+            <p style={st.sectionTitle}>SCREENING TEST — ANSWER RATINGS</p>
+            {questionScores.map((q) => {
+              const s     = parseFloat(q.score ?? 0);
+              const color = s >= 7.5 ? "#16a34a" : s >= 5 ? "#d97706" : "#dc2626";
+              const bg    = s >= 7.5 ? "#dcfce7" : s >= 5 ? "#fef3c7" : "#fee2e2";
+              return (
+                <div key={q.index} style={{ marginBottom: 14 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 12, color: "#374151", flex: 1, lineHeight: 1.4 }}>
+                      <strong style={{ color: "#6b7280" }}>Q{q.index}.</strong> {q.question}
+                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color, background: bg, padding: "2px 8px", borderRadius: 999, whiteSpace: "nowrap", flexShrink: 0 }}>
+                      {s.toFixed(1)} / 10
+                    </span>
+                  </div>
+                  <div style={{ height: 4, background: "#f3f4f6", borderRadius: 999, overflow: "hidden", marginBottom: q.answer ? 6 : 0 }}>
+                    <div style={{ height: "100%", width: `${(s / 10) * 100}%`, background: color, borderRadius: 999 }} />
+                  </div>
+                  {q.answer && (
+                    <p style={{ margin: "4px 0 0", fontSize: 12, color: "#6b7280", lineHeight: 1.5, fontStyle: "italic", paddingLeft: 2 }}>
+                      <strong style={{ fontStyle: "normal", color: "#9ca3af" }}>AI note:</strong> {q.answer}
+                    </p>
+                  )}
+                  {q.candidate_answer && (
+                    <p style={{ margin: "4px 0 0", fontSize: 12, color: "#374151", lineHeight: 1.5, paddingLeft: 2, borderLeft: "2px solid #e5e7eb", paddingLeft: 8 }}>
+                      {q.candidate_answer}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Skills */}
         {skills.length > 0 && (
@@ -218,14 +274,12 @@ export default function CandidateDrawer({ candidate, onClose, onRescreen }) {
           </div>
         )}
 
-
-
-        {/* Meta */}
+        {/* Details */}
         <div style={st.section}>
           <p style={st.sectionTitle}>DETAILS</p>
-          {candidate.current_company && <p style={st.metaRow}>🏢 Company: <strong>{candidate.current_company}</strong></p>}
-          {candidate.current_ctc && <p style={st.metaRow}>💰 Current CTC: <strong>₹{candidate.current_ctc} LPA</strong></p>}
-          {candidate.expected_ctc && <p style={st.metaRow}>🎯 Expected CTC: <strong>₹{candidate.expected_ctc} LPA</strong></p>}
+          {candidate.current_company  && <p style={st.metaRow}>🏢 Company: <strong>{candidate.current_company}</strong></p>}
+          {candidate.current_ctc      && <p style={st.metaRow}>💰 Current CTC: <strong>₹{candidate.current_ctc} LPA</strong></p>}
+          {candidate.expected_ctc     && <p style={st.metaRow}>🎯 Expected CTC: <strong>₹{candidate.expected_ctc} LPA</strong></p>}
           {candidate.relocation_ready != null && <p style={st.metaRow}>📍 Relocation: <strong>{candidate.relocation_ready ? "Open" : "Not open"}</strong></p>}
           <p style={st.metaRow}>📅 Applied: {new Date(candidate.created_at).toLocaleDateString()}</p>
           <p style={st.metaRow}>📄 Screening: {candidate.screening_status || "pending"}</p>
@@ -233,7 +287,8 @@ export default function CandidateDrawer({ candidate, onClose, onRescreen }) {
           {candidate.linkedin_url && candidate.linkedin_url.includes("linkedin.com") && (
             <p style={st.metaRow}>
               💼 LinkedIn:{" "}
-              <a href={candidate.linkedin_url.startsWith("http") ? candidate.linkedin_url : `https://${candidate.linkedin_url}`} target="_blank" rel="noopener noreferrer"
+              <a href={candidate.linkedin_url.startsWith("http") ? candidate.linkedin_url : `https://${candidate.linkedin_url}`}
+                target="_blank" rel="noopener noreferrer"
                 style={{ color: "#0052cc", fontWeight: 500, textDecoration: "none" }}>
                 Click to View Profile
               </a>
@@ -243,8 +298,7 @@ export default function CandidateDrawer({ candidate, onClose, onRescreen }) {
             {candidate.resume_serve_name && (
               <a
                 href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/uploads/${candidate.resume_serve_name}`}
-                target="_blank"
-                rel="noopener noreferrer"
+                target="_blank" rel="noopener noreferrer"
                 style={st.viewResumeBtn}
               >
                 📄 View Resume
@@ -269,7 +323,7 @@ export default function CandidateDrawer({ candidate, onClose, onRescreen }) {
           )}
         </div>
 
-        {/* Recruiter Action — shown when AI screening is done and awaiting decision */}
+        {/* Recruiter Action */}
         {(candidate.status === "screen_select" || candidate.status === "SCREEN_SELECT") && (
           <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: 16, marginTop: 16 }}>
             <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.08em" }}>RECRUITER ACTION</p>
@@ -304,24 +358,24 @@ export default function CandidateDrawer({ candidate, onClose, onRescreen }) {
 }
 
 const st = {
-  overlay:      { position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 40 },
-  drawer:       { position: "fixed", top: 0, right: 0, width: 400, height: "100vh", background: "#fff", boxShadow: "-4px 0 24px rgba(0,0,0,0.12)", zIndex: 50, overflowY: "auto", padding: 24, boxSizing: "border-box" },
-  header:       { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, gap: 12 },
-  name:         { margin: 0, fontSize: 18, fontWeight: 700, color: "#111827" },
-  meta:         { margin: "3px 0 0", fontSize: 12, color: "#6b7280" },
-  closeBtn:     { background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#6b7280", flexShrink: 0 },
-  pill:         { fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 9999 },
-  section:      { borderTop: "1px solid #f3f4f6", paddingTop: 14, marginTop: 14 },
-  sectionTitle: { margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.08em", textTransform: "uppercase" },
-  scoreRow:     { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
-  skillTag:     { background: "#e6f0ff", color: "#0052cc", fontSize: 11, fontWeight: 500, padding: "3px 10px", borderRadius: 999 },
-  bulletRow:    { display: "flex", alignItems: "flex-start", marginBottom: 6 },
-  metaRow:      { margin: "0 0 6px", fontSize: 13, color: "#374151" },
-  viewResumeBtn: { display: "inline-block", marginTop: 0, padding: "7px 14px", background: "#e6f0ff", color: "#0052cc", borderRadius: 7, fontSize: 13, fontWeight: 600, textDecoration: "none", borderWidth: 1, borderStyle: "solid", borderColor: "#bfdbfe" },
-  insightCard:  { background: "linear-gradient(135deg,#eef2ff 0%,#f5f3ff 100%)", border: "1px solid #c7d2fe", borderRadius: 10, padding: "12px 16px", marginBottom: 16, backdropFilter: "blur(4px)" },
-  insightLabel: { margin: "0 0 6px", fontSize: 11, fontWeight: 700, color: "#4f46e5", letterSpacing: "0.08em", textTransform: "uppercase" },
-  insightText:  { margin: 0, fontSize: 13, color: "#312e81", lineHeight: 1.6 },
-  pulse:        { display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#d97706", animation: "pulse 1.4s ease-in-out infinite", flexShrink: 0 },
+  overlay:       { position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 40 },
+  drawer:        { position: "fixed", top: 0, right: 0, width: 400, height: "100vh", background: "#fff", boxShadow: "-4px 0 24px rgba(0,0,0,0.12)", zIndex: 50, overflowY: "auto", padding: 24, boxSizing: "border-box" },
+  header:        { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, gap: 12 },
+  name:          { margin: 0, fontSize: 18, fontWeight: 700, color: "#111827" },
+  meta:          { margin: "3px 0 0", fontSize: 12, color: "#6b7280" },
+  closeBtn:      { background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#6b7280", flexShrink: 0 },
+  pill:          { fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 9999 },
+  section:       { borderTop: "1px solid #f3f4f6", paddingTop: 14, marginTop: 14 },
+  sectionTitle:  { margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.08em", textTransform: "uppercase" },
+  skillTag:      { background: "#e6f0ff", color: "#0052cc", fontSize: 11, fontWeight: 500, padding: "3px 10px", borderRadius: 999 },
+  bulletRow:     { display: "flex", alignItems: "flex-start", marginBottom: 6 },
+  metaRow:       { margin: "0 0 6px", fontSize: 13, color: "#374151" },
+  viewResumeBtn: { display: "inline-block", padding: "7px 14px", background: "#e6f0ff", color: "#0052cc", borderRadius: 7, fontSize: 13, fontWeight: 600, textDecoration: "none", borderWidth: 1, borderStyle: "solid", borderColor: "#bfdbfe" },
+  insightCard:   { background: "linear-gradient(135deg,#eef2ff 0%,#f5f3ff 100%)", border: "1px solid #c7d2fe", borderRadius: 10, padding: "12px 16px", marginBottom: 16, backdropFilter: "blur(4px)" },
+  insightLabel:  { margin: "0 0 6px", fontSize: 11, fontWeight: 700, color: "#4f46e5", letterSpacing: "0.08em", textTransform: "uppercase" },
+  insightText:   { margin: 0, fontSize: 13, color: "#312e81", lineHeight: 1.6 },
+  waBtn:         { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, borderRadius: "50%", background: "#f0fdf4", border: "1px solid #bbf7d0", flexShrink: 0, textDecoration: "none" },
+  pulse:         { display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#d97706", animation: "pulse 1.4s ease-in-out infinite", flexShrink: 0 },
 };
 
 // Inject pulse keyframe once

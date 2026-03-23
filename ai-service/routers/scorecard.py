@@ -54,8 +54,8 @@ async def _fetch_interview_responses(pool, interview_id: str) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-async def _call_llm(job_role: str, evaluations: list[dict]) -> dict:
-    prompt = build_final_scorecard_prompt(job_role, evaluations)
+async def _call_llm(job_role: str, evaluations: list[dict], candidate_details: dict = None) -> dict:
+    prompt = build_final_scorecard_prompt(job_role, evaluations, candidate_details)
     response = await _get_client().chat.completions.create(
         model="gpt-4o-mini",
         messages=[
@@ -95,7 +95,14 @@ async def generate_scorecard(req: ScorecardRequest):
     )
     recommendation = derive_recommendation(overall_score)
 
-    # 5. LLM narrative feedback
+    # 5. Fetch candidate details to prevent hallucinated weaknesses
+    candidate_row = await pool.fetchrow(
+        "SELECT current_ctc, expected_ctc, notice_period, experience_years FROM candidates WHERE id = $1",
+        req.candidate_id,
+    )
+    candidate_details = dict(candidate_row) if candidate_row else None
+
+    # 6. LLM narrative feedback
     evaluations = [
         {
             "question":             r["question_text"],
@@ -105,21 +112,38 @@ async def generate_scorecard(req: ScorecardRequest):
         }
         for r in responses
     ]
-    llm_result = await _call_llm(interview["job_role"], evaluations)
+    llm_result = await _call_llm(interview["job_role"], evaluations, candidate_details)
+
+    # Build per-question scores (0–10 scale)
+    question_scores = [
+        {
+            "index":     i + 1,
+            "question":  r["question_text"],
+            "score":     round(
+                min(10.0, max(0.0, (
+                    (r.get("technical_score") or 0) * 0.75
+                    + (r.get("communication_score") or 0) * 0.25
+                ) / 10)),
+                1
+            ),
+        }
+        for i, r in enumerate(responses)
+    ]
 
     # 6. Persist scorecard
     await pool.execute(
         """INSERT INTO evaluation_scores
              (candidate_id, interview_id, resume_score, technical_score,
               communication_score, confidence_score, overall_score,
-              strengths, weaknesses, ai_recommendation, ai_feedback)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+              strengths, weaknesses, ai_recommendation, ai_feedback, question_scores)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
            ON CONFLICT (candidate_id, interview_id)
            DO UPDATE SET
-             overall_score    = EXCLUDED.overall_score,
+             overall_score     = EXCLUDED.overall_score,
              ai_recommendation = EXCLUDED.ai_recommendation,
-             ai_feedback      = EXCLUDED.ai_feedback,
-             evaluated_at     = NOW()""",
+             ai_feedback       = EXCLUDED.ai_feedback,
+             question_scores   = EXCLUDED.question_scores,
+             evaluated_at      = NOW()""",
         req.candidate_id,
         req.interview_id,
         resume_score,
@@ -131,6 +155,7 @@ async def generate_scorecard(req: ScorecardRequest):
         json.dumps(llm_result.get("weaknesses", [])),
         recommendation,
         llm_result.get("ai_feedback", ""),
+        json.dumps(question_scores),
     )
 
     # 7. Update candidate pipeline status
@@ -150,6 +175,7 @@ async def generate_scorecard(req: ScorecardRequest):
         "strengths":          llm_result.get("strengths", []),
         "weaknesses":         llm_result.get("weaknesses", []),
         "ai_feedback":        llm_result.get("ai_feedback", ""),
+        "question_scores":    question_scores,
     }
 
 

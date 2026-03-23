@@ -1,7 +1,7 @@
 const db          = require("../db");
 const smsProvider = require("../services/smsProvider");
 
-async function sendSMS(req, res) {
+async function sendWhatsApp(req, res) {
   try {
     const { candidate_id, body } = req.body;
     if (!candidate_id || !body?.trim())
@@ -20,9 +20,9 @@ async function sendSMS(req, res) {
 
     try {
       const providerRes = await smsProvider.send(phone, body.trim());
-      console.log("[SMS] Sent via provider:", providerRes.sid);
+      console.log("[WhatsApp] Sent via Twilio:", providerRes.sid);
     } catch (err) {
-      console.error("[SMS] Provider error:", err.message);
+      console.error("[WhatsApp] Twilio error:", err.message);
       // Still save to DB so history is preserved even if provider fails
     }
 
@@ -31,10 +31,10 @@ async function sendSMS(req, res) {
       [candidate_id, body.trim()]
     );
 
-    res.json({ success: true, message: "SMS sent and logged." });
+    res.json({ success: true, message: "WhatsApp message sent and logged." });
   } catch (err) {
-    console.error("[SMS] sendSMS error:", err.message);
-    res.status(500).json({ error: "Failed to send SMS" });
+    console.error("[WhatsApp] sendWhatsApp error:", err.message);
+    res.status(500).json({ error: "Failed to send WhatsApp message" });
   }
 }
 
@@ -78,4 +78,4 @@ async function getMessages(req, res) {
   }
 }
 
-module.exports = { sendSMS, receiveSMS, getMessages };
+module.exports = { sendSMS: sendWhatsApp, receiveSMS, getMessages };

@@ -37,6 +37,7 @@ async function getJobRole(req, res) {
   const result = await db.query(
     `SELECT id, title, original_jd_text, key_points, mandatory_skills, created_at
      FROM job_roles WHERE id = $1`,
+
     [req.params.id]
   );
   if (!result.rows.length) return res.status(404).json({ error: "Job role not found" });

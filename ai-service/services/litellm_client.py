@@ -64,7 +64,7 @@ async def _call_model(model: str, prompt: str, system: str, api_base: str = None
         model=model,
         messages=[{"role": "system", "content": system}, {"role": "user", "content": prompt}],
         temperature=0.2,
-        max_tokens=1024,
+        max_tokens=2048,
         response_format={"type": "json_object"},
     )
     if api_base:

@@ -49,7 +49,12 @@ export default function FilterSidebar({ filters, set, toggle, reset, saved: save
     <aside style={s.sidebar}>
       <div style={s.sidebarHead}>
         <span style={s.sidebarTitle}>🔍 Filters</span>
-        <button onClick={reset} style={s.resetBtn}>Reset all</button>
+        <button
+          onClick={reset}
+          style={s.resetBtn}
+          onMouseEnter={(e) => { e.currentTarget.style.textDecoration = "underline"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
+        >Reset all</button>
       </div>
 
       {/* Messages Nav */}
@@ -69,17 +74,28 @@ export default function FilterSidebar({ filters, set, toggle, reset, saved: save
 
       {/* AI Match Score */}
       <Section title="AI Match Score">
-        <div style={s.rangeRow}>
-          <span style={s.rangeVal}>{filters.scoreMin}</span>
+        <style>{`
+          .range-thumb::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #2563eb; border: 2px solid #fff; box-shadow: 0 0 0 1px #2563eb; cursor: pointer; pointer-events: all; }
+          .range-thumb::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #2563eb; border: 2px solid #fff; box-shadow: 0 0 0 1px #2563eb; cursor: pointer; pointer-events: all; }
+          .range-thumb:disabled::-webkit-slider-thumb { background: #9ca3af; box-shadow: 0 0 0 1px #9ca3af; }
+        `}</style>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+          <span style={s.rangeVal}>{filters.scoreMin}%</span>
           <div style={s.rangeTrack}>
+            <div style={s.trackBase} />
+            <div style={{ ...s.trackFill, left: `${filters.scoreMin}%`, width: `${filters.scoreMax - filters.scoreMin}%` }} />
             <input type="range" min={0} max={100} value={filters.scoreMin}
               onChange={(e) => set("scoreMin", Math.min(+e.target.value, filters.scoreMax - 1))}
-              style={s.range} disabled={filters.geniusMatch} />
+              disabled={filters.geniusMatch}
+              className="range-thumb"
+              style={{ ...s.rangeInput, zIndex: filters.scoreMin >= filters.scoreMax - 10 ? 5 : 3 }} />
             <input type="range" min={0} max={100} value={filters.scoreMax}
               onChange={(e) => set("scoreMax", Math.max(+e.target.value, filters.scoreMin + 1))}
-              style={s.range} disabled={filters.geniusMatch} />
+              disabled={filters.geniusMatch}
+              className="range-thumb"
+              style={{ ...s.rangeInput, zIndex: 4 }} />
           </div>
-          <span style={s.rangeVal}>{filters.scoreMax}</span>
+          <span style={s.rangeVal}>{filters.scoreMax}%</span>
         </div>
         {filters.geniusMatch && <p style={s.hint}>Overridden by Genius Match (85–100)</p>}
       </Section>
@@ -181,33 +197,37 @@ export default function FilterSidebar({ filters, set, toggle, reset, saved: save
   );
 }
 
+const FONT = "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 const s = {
-  sidebar:      { width: 240, minWidth: 240, background: "#fff", borderRight: "1px solid #e5e7eb", overflowY: "auto", height: "100vh", position: "sticky", top: 0, padding: "16px 0", boxSizing: "border-box", flexShrink: 0 },
+  sidebar:      { width: 240, minWidth: 240, background: "#fff", borderRight: "1px solid #e5e7eb", overflowY: "auto", height: "100vh", position: "sticky", top: 0, padding: "16px 0", boxSizing: "border-box", flexShrink: 0, fontFamily: FONT },
   sidebarHead:  { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 16px 12px", borderBottom: "1px solid #f3f4f6" },
-  sidebarTitle: { fontWeight: 700, fontSize: 14, color: "#111827" },
-  resetBtn:     { fontSize: 12, color: "#6b7280", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" },
-  navLink:      { display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", fontSize: 13, fontWeight: 600, color: "#4f46e5", textDecoration: "none", borderBottom: "1px solid #f3f4f6", background: "#fafafa" },
-  navBadge:     { marginLeft: "auto", fontSize: 10, fontWeight: 700, background: "#eef2ff", color: "#4f46e5", padding: "2px 7px", borderRadius: 999 },
+  sidebarTitle: { fontWeight: 700, fontSize: 14, color: "#111827", fontFamily: FONT },
+  resetBtn:     { fontSize: 12, color: "#0052cc", background: "none", border: "none", cursor: "pointer", textDecoration: "none", fontFamily: FONT },
+  navLink:      { display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", fontSize: 13, fontWeight: 600, color: "#4f46e5", textDecoration: "none", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontFamily: FONT },
+  navBadge:     { marginLeft: "auto", fontSize: 10, fontWeight: 700, background: "#eef2ff", color: "#4f46e5", padding: "2px 7px", borderRadius: 999, fontFamily: FONT },
   geniusRow:    { padding: "10px 16px", background: "#fffbeb", borderBottom: "1px solid #fef3c7" },
-  geniusLabel:  { display: "flex", alignItems: "center", fontSize: 13, fontWeight: 600, color: "#92400e", cursor: "pointer" },
-  geniusHint:   { fontWeight: 400, color: "#b45309", marginLeft: 4, fontSize: 11 },
+  geniusLabel:  { display: "flex", alignItems: "center", fontSize: 13, fontWeight: 600, color: "#92400e", cursor: "pointer", fontFamily: FONT },
+  geniusHint:   { fontWeight: 400, color: "#b45309", marginLeft: 4, fontSize: 11, fontFamily: FONT },
   section:      { borderBottom: "1px solid #f3f4f6" },
-  sectionHead:  { width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", background: "none", border: "none", cursor: "pointer", textAlign: "left" },
-  sectionTitle: { fontSize: 12, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.05em" },
+  sectionHead:  { width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", background: "none", border: "none", cursor: "pointer", textAlign: "left", fontFamily: FONT },
+  sectionTitle: { fontSize: 12, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.05em", fontFamily: FONT },
   sectionBody:  { padding: "4px 16px 12px" },
   tagWrap:      { display: "flex", flexWrap: "wrap", gap: 5 },
-  tag:          { padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 500, borderWidth: 1, borderStyle: "solid", borderColor: "#e5e7eb", background: "#f9fafb", color: "#374151", cursor: "pointer" },
+  tag:          { padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 500, borderWidth: 1, borderStyle: "solid", borderColor: "#e5e7eb", background: "#f9fafb", color: "#374151", cursor: "pointer", fontFamily: FONT },
   tagActive:    { background: "#eff6ff", borderColor: "#93c5fd", color: "#1d4ed8" },
-  rangeRow:     { display: "flex", alignItems: "center", gap: 6, marginBottom: 4 },
-  rangeTrack:   { flex: 1, display: "flex", flexDirection: "column", gap: 2 },
-  range:        { width: "100%", accentColor: "#2563eb", cursor: "pointer" },
-  rangeVal:     { fontSize: 11, color: "#6b7280", minWidth: 22, textAlign: "center" },
-  hint:         { margin: "4px 0 0", fontSize: 11, color: "#9ca3af" },
+  rangeVal:     { fontSize: 12, color: "#666666", minWidth: 24, textAlign: "center", fontFamily: FONT, fontVariantNumeric: "tabular-nums" },
+  rangeLabel:   { fontSize: 11, color: "#9ca3af", fontFamily: FONT },
+  scoreInput:   { width: 44, padding: "4px 6px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 12, textAlign: "center", fontFamily: FONT, outline: "none" },
+  rangeTrack:   { flex: 1, position: "relative", height: 20, display: "flex", alignItems: "center" },
+  trackBase:    { position: "absolute", left: 0, right: 0, height: 4, borderRadius: 999, background: "#e5e7eb", zIndex: 1 },
+  trackFill:    { position: "absolute", height: 4, borderRadius: 999, background: "#2563eb", zIndex: 2, pointerEvents: "none" },
+  rangeInput:   { position: "absolute", left: 0, width: "100%", height: 4, margin: 0, background: "transparent", appearance: "none", WebkitAppearance: "none", MozAppearance: "none", cursor: "pointer", pointerEvents: "none" },
+  hint:         { margin: "4px 0 0", fontSize: 11, color: "#9ca3af", fontFamily: FONT },
   skillInputRow:{ display: "flex", gap: 4, marginTop: 6 },
-  skillInput:   { flex: 1, padding: "5px 8px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 12, outline: "none" },
-  addBtn:       { padding: "5px 10px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, cursor: "pointer", fontWeight: 700 },
+  skillInput:   { flex: 1, padding: "5px 8px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 12, outline: "none", fontFamily: FONT },
+  addBtn:       { padding: "5px 10px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, cursor: "pointer", fontWeight: 700, fontFamily: FONT },
   saveRow:      { display: "flex", gap: 4, marginBottom: 8 },
   savedItem:    { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
-  savedLabel:   { fontSize: 12, color: "#2563eb", background: "none", border: "none", cursor: "pointer", textAlign: "left", flex: 1, padding: "2px 0" },
-  deleteBtn:    { fontSize: 10, color: "#9ca3af", background: "none", border: "none", cursor: "pointer" },
+  savedLabel:   { fontSize: 12, color: "#2563eb", background: "none", border: "none", cursor: "pointer", textAlign: "left", flex: 1, padding: "2px 0", fontFamily: FONT },
+  deleteBtn:    { fontSize: 10, color: "#9ca3af", background: "none", border: "none", cursor: "pointer", fontFamily: FONT },
 };

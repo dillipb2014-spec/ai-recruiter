@@ -192,10 +192,16 @@ async function sendScreeningTest(req, res) {
   // Move to screening
   await db.query("UPDATE candidates SET status = 'screening' WHERE id = $1", [id]);
 
-  // Trigger AI screening if resume exists
+  // Send screening test email
+  const emailErr = await sendScreeningTestEmail(
+    { id: candidate.id, full_name: candidate.full_name, email: candidate.email },
+    candidate.job_role_title
+  ).then(() => null).catch((err) => err.message);
+
+  // Trigger AI resume screening if resume exists (fire-and-forget)
   if (candidate.resume_id && candidate.file_path) {
-    const AI_BASE   = process.env.AI_SERVICE_URL || "http://localhost:8000";
-    const screenUrl = new URL("/screen-resume", AI_BASE).toString();
+    const AI_BASE      = process.env.AI_SERVICE_URL || "http://localhost:8000";
+    const screenUrl    = new URL("/screen-resume", AI_BASE).toString();
     const INTERNAL_KEY = process.env.INTERNAL_API_KEY || "";
     fetch(screenUrl, {
       method: "POST",
@@ -204,7 +210,13 @@ async function sendScreeningTest(req, res) {
     }).catch((err) => console.error("AI screen trigger failed:", err.message));
   }
 
-  res.json({ message: "Screening test triggered", id, status: "screening" });
+  res.json({
+    message: "Screening test triggered",
+    id,
+    status: "screening",
+    email_sent: !emailErr,
+    ...(emailErr && { email_error: emailErr }),
+  });
 }
 
 module.exports = { registerCandidate, getCandidate, listCandidates, bulkUpdateStatus, sendScreeningTest };
