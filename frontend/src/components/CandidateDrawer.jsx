@@ -324,7 +324,7 @@ export default function CandidateDrawer({ candidate, onClose, onRescreen }) {
         </div>
 
         {/* Recruiter Action */}
-        {(candidate.status === "screen_select" || candidate.status === "SCREEN_SELECT") && (
+        {(candidate.status === "screen_select" || candidate.status === "SCREEN_SELECT" || candidate.status === "screen_reject" || candidate.status === "SCREEN_REJECT") && (
           <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: 16, marginTop: 16 }}>
             <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.08em" }}>RECRUITER ACTION</p>
             <div style={{ display: "flex", gap: 8 }}>
