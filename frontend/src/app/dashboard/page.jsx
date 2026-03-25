@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback, Suspense } from "react";
+import { useRouter } from "next/navigation";
 import ScoreBadge from "@/components/ScoreBadge";
 import CandidateDrawer from "@/components/CandidateDrawer";
 import JobRolesModal from "@/components/JobRolesModal";
@@ -11,6 +12,8 @@ import {
   bulkUpdateStatus, sendRejectionEmails,
   sendScreeningTest,
 } from "@/lib/api";
+
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 const STATUS_STYLE = {
   applied:                  { background: "#eff6ff", color: "#2563eb" },
@@ -29,6 +32,23 @@ const STATUS_STYLE = {
 };
 
 function DashboardInner() {
+  const router = useRouter();
+  const [recruiter, setRecruiter] = useState(null);
+
+  useEffect(() => {
+    fetch(`${API}/api/admin/me`, { credentials: "include" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data) router.replace("/login");
+        else setRecruiter(data);
+      })
+      .catch(() => router.replace("/login"));
+  }, []);
+
+  async function handleLogout() {
+    await fetch(`${API}/api/admin/logout`, { method: "POST", credentials: "include" });
+    router.replace("/login");
+  }
   const {
     filters, set, toggle, reset,
     activePills, removePill,
@@ -189,6 +209,12 @@ function DashboardInner() {
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <a href="/reports" style={s.btnSecondary}>📊 Reports</a>
             <button onClick={() => setShowRoles(true)} style={s.btnPrimary}>+ Job Roles</button>
+            {recruiter && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 8 }}>
+                <span style={{ fontSize: 13, color: "#6b7280" }}>{recruiter.name}</span>
+                <button onClick={handleLogout} style={{ padding: "7px 12px", background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Logout</button>
+              </div>
+            )}
           </div>
         </div>
 

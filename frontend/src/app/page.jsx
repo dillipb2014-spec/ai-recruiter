@@ -52,7 +52,7 @@ export default function HomePage() {
 
         <div style={s.btnCol}>
           <a href="/apply" style={s.btnPrimary}>Apply for a Position →</a>
-          <a href="/dashboard" style={s.btnSecondary}>Recruiter Dashboard</a>
+          <a href="/dashboard" style={s.btnSecondary}>Recruiter Login</a>
         </div>
       </div>
     </main>
