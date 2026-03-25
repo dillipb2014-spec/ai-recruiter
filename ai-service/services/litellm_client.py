@@ -2,40 +2,7 @@ import os
 import json
 import re
 import html
-import litellm
-import yaml
-
-litellm.drop_params = True
-litellm.set_verbose = False
-litellm.model_cost = {}  # Disable fetching model cost map
-
-# Set API keys from environment
-if os.getenv("ANTHROPIC_API_KEY"):
-    os.environ["ANTHROPIC_API_KEY"] = os.getenv("ANTHROPIC_API_KEY")
-elif os.getenv("OPENAI_API_KEY"):
-    os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
-if os.getenv("GOOGLE_API_KEY"):
-    os.environ["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY")
-
-config_path = os.path.join(os.path.dirname(__file__), "..", "..", "litellm_config.yaml")
-if os.path.exists(config_path):
-    with open(config_path) as f:
-        config = yaml.safe_load(f)
-        if config and "model_list" in config:
-            for m in config["model_list"]:
-                if "genius-ai-model" in m.get("model_name", ""):
-                    litellm_params = m.get("litellm_params", {})
-                    os.environ.setdefault("LITELLM_MODEL", litellm_params.get("model", "ollama/llama3.2:1b"))
-                    os.environ.setdefault("LITELLM_API_BASE", litellm_params.get("api_base", "http://localhost:11434"))
-                    break
-
-def _model() -> str:
-    return os.getenv("LITELLM_MODEL", "ollama/llama3.2:1b")
-
-
-def _api_base() -> str:
-    return os.getenv("LITELLM_API_BASE", "http://localhost:11434")
-
+import httpx
 
 SYSTEM_PROMPT = (
     "You are a senior technical recruiter at Juspay, a fintech company building "
@@ -51,7 +18,6 @@ def _sanitize(text: str, max_len: int = 8000) -> str:
 
 
 def _extract_json(raw: str) -> str:
-    """Extract the first complete JSON object from raw LLM output."""
     start = raw.find("{")
     end = raw.rfind("}")
     if start == -1 or end == -1 or end < start:
@@ -59,43 +25,32 @@ def _extract_json(raw: str) -> str:
     return raw[start:end + 1]
 
 
-async def _call_model(model: str, prompt: str, system: str, api_base: str = None, api_key: str = None) -> str:
-    kwargs = dict(
-        model=model,
-        messages=[{"role": "system", "content": system}, {"role": "user", "content": prompt}],
-        temperature=0.2,
-        max_tokens=2048,
-    )
-    if api_base:
-        kwargs["api_base"] = api_base
-    if api_key:
-        kwargs["api_key"] = api_key
-    response = await litellm.acompletion(**kwargs)
-    raw = response.choices[0].message.content or ""
-    print(f"[{model}] Raw Response: {raw}")
-    return _extract_json(raw)
-
-
 async def litellm_generate(prompt: str, system: str = SYSTEM_PROMPT) -> str:
-    """Call Juspay Grid first, fall back to local Ollama."""
-    grid_key = os.getenv("JUSPAY_GRID_API_KEY")
-    grid_base = os.getenv("JUSPAY_GRID_BASE_URL", "https://grid.ai.juspay.net/v1")
-    grid_model = os.getenv("JUSPAY_GRID_MODEL", "open-large")
+    grid_key   = os.getenv("JUSPAY_GRID_API_KEY")
+    grid_base  = os.getenv("JUSPAY_GRID_BASE_URL", "https://grid.ai.juspay.net/v1")
+    grid_model = os.getenv("JUSPAY_GRID_MODEL", "open-fast")
 
-    if grid_key:
-        return await _call_model(
-            f"openai/{grid_model}", prompt, system,
-            api_base=grid_base, api_key=grid_key
+    if not grid_key:
+        raise RuntimeError("JUSPAY_GRID_API_KEY is not set")
+
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.post(
+            f"{grid_base}/chat/completions",
+            headers={"Authorization": f"Bearer {grid_key}", "Content-Type": "application/json"},
+            json={
+                "model": grid_model,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user",   "content": prompt},
+                ],
+                "temperature": 0.2,
+                "max_tokens": 2048,
+            },
         )
-
-    # Local dev only — Ollama fallback
-    if os.getenv("NODE_ENV") != "production" and os.getenv("RENDER") is None:
-        return await _call_model(
-            "ollama/llama3:latest", prompt, system,
-            api_base="http://127.0.0.1:11434"
-        )
-
-    raise RuntimeError("No LLM configured — set JUSPAY_GRID_API_KEY env var")
+        resp.raise_for_status()
+        raw = resp.json()["choices"][0]["message"]["content"] or ""
+        print(f"[grid/{grid_model}] raw: {raw[:200]}")
+        return _extract_json(raw)
 
 
 ollama_generate = litellm_generate
