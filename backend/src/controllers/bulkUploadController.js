@@ -102,30 +102,26 @@ async function processBulkRows(bulkId, rows, roleId, jobTitle) {
       );
       const candidateId = cResult.rows[0].id;
 
-      // Download and store resume — recruiter triggers AI later
+      // Download resume and store in DB as file_data
       if (resumeLink) {
         const fileName = `bulk_${candidateId}.pdf`;
-        const destPath = path.join(UPLOAD_DIR, fileName);
-        let filePath = null;
+        let fileBuffer = null;
 
         if (resumeLink.startsWith("http://") || resumeLink.startsWith("https://")) {
           const downloadUrl = toDriveDirectUrl(resumeLink);
           try {
-            await downloadFile(downloadUrl, destPath);
-            filePath = destPath;
+            fileBuffer = await downloadBuffer(downloadUrl);
           } catch (dlErr) {
             console.error(`Failed to download resume for ${email}:`, dlErr.message);
           }
-        } else if (fs.existsSync(resumeLink)) {
-          filePath = resumeLink;
         }
 
-        if (filePath) {
+        if (fileBuffer) {
           await db.query("DELETE FROM resumes WHERE candidate_id = $1", [candidateId]);
           await db.query(
-            `INSERT INTO resumes (candidate_id, file_path, file_name, mime_type)
-             VALUES ($1, $2, $3, 'application/pdf')`,
-            [candidateId, filePath, fileName]
+            `INSERT INTO resumes (candidate_id, file_path, file_name, mime_type, file_data)
+             VALUES ($1, $2, $3, 'application/pdf', $4)`,
+            [candidateId, fileName, fileName, fileBuffer]
           );
         }
       }
