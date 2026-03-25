@@ -37,7 +37,7 @@ app.use("/uploads", (req, res, next) => {
 }, express.static(path.resolve(uploadDir)));
 
 // ── CSRF token endpoint (frontend fetches this on load) ─
-const csrfProtection = csurf({ cookie: { httpOnly: true, sameSite: "lax" } });
+const csrfProtection = csurf({ cookie: { httpOnly: true, sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", secure: process.env.NODE_ENV === "production" } });
 app.get("/api/csrf-token", csrfProtection, (req, res) => {
   res.json({ csrfToken: req.csrfToken() });
 });
