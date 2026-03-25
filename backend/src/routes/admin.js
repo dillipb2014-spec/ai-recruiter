@@ -66,7 +66,7 @@ router.get("/me", (req, res) => {
 // POST /api/admin/register — create first recruiter account
 router.post("/register", async (req, res) => {
   const { name, email, password, secret } = req.body;
-  if (secret !== (process.env.ADMIN_SECRET || "geniushire_admin"))
+  if (secret !== (process.env.ADMIN_SECRET || "juspay_ai_recruiter_admin"))
     return res.status(403).json({ error: "Invalid admin secret" });
   if (!name || !email || !password) return res.status(400).json({ error: "name, email, password required" });
 

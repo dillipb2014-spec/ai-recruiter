@@ -1,6 +1,6 @@
 const https = require("https");
 
-const FROM = process.env.SMTP_FROM || "GeniusHire AI <onboarding@resend.dev>";
+const FROM = process.env.SMTP_FROM || "Juspay AI Recruiter <onboarding@resend.dev>";
 
 async function _sendViaResend(to, subject, html) {
   const apiKey = process.env.RESEND_API_KEY || process.env.SMTP_PASS;

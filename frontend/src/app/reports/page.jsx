@@ -173,7 +173,7 @@ export default function ReportsPage() {
     const buf = await wb.xlsx.writeBuffer();
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
-    a.download = `geniushire-report-${new Date().toISOString().slice(0,10)}.xlsx`;
+    a.download = `juspay-ai-recruiter-report-${new Date().toISOString().slice(0,10)}.xlsx`;
     a.click();
   }
 

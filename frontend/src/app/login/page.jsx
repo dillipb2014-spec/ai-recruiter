@@ -35,8 +35,8 @@ export default function LoginPage() {
     <main style={s.bg}>
       <div style={s.card}>
         <div style={s.brand}>
-          <span style={s.logo}>GeniusHire</span>
-          <span style={s.logoAi}>AI</span>
+          <span style={s.logo}>Juspay AI</span>
+          <span style={s.logoAi}>Recruiter</span>
         </div>
         <p style={s.sub}>Recruiter Portal</p>
 
