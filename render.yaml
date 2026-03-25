@@ -1,6 +1,30 @@
 services:
   - type: web
-    name: ai-service
+    name: geniushire-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install && npx prisma generate --config prisma.config.ts
+    startCommand: node src/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: INTERNAL_API_KEY
+        sync: false
+      - key: AI_SERVICE_URL
+        sync: false
+      - key: ALLOWED_ORIGIN
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: UPLOAD_DIR
+        value: /tmp/uploads
+
+  - type: web
+    name: geniushire-ai
     runtime: python
     rootDir: ai-service
     buildCommand: pip install --no-cache-dir -r requirements.txt
@@ -8,3 +32,17 @@ services:
     envVars:
       - key: WHISPER_MODEL
         value: tiny
+      - key: DATABASE_URL
+        sync: false
+      - key: INTERNAL_API_KEY
+        sync: false
+      - key: JUSPAY_GRID_API_KEY
+        sync: false
+      - key: JUSPAY_GRID_BASE_URL
+        sync: false
+      - key: JUSPAY_GRID_MODEL
+        sync: false
+      - key: ALLOWED_ORIGIN
+        sync: false
+      - key: UPLOAD_DIR
+        value: /tmp/uploads
