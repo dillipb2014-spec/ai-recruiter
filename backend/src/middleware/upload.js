@@ -1,14 +1,5 @@
 const multer = require("multer");
 const path = require("path");
-const { v4: uuidv4 } = require("uuid");
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, process.env.UPLOAD_DIR || "uploads"),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${uuidv4()}${ext}`);
-  },
-});
 
 const fileFilter = (req, file, cb) => {
   const allowed = [".pdf", ".doc", ".docx"];
@@ -18,8 +9,9 @@ const fileFilter = (req, file, cb) => {
     : cb(new Error("Only PDF, DOC, and DOCX files are allowed"), false);
 };
 
+// Store in memory so we can save to DB — no disk dependency
 module.exports = multer({
-  storage,
+  storage: multer.memoryStorage(),
   fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
 });

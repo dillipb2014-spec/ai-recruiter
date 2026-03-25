@@ -1,7 +1,7 @@
 const router = require("express").Router();
 const csurf  = require("csurf");
 const upload = require("../middleware/upload");
-const { uploadResume, getResume } = require("../controllers/resumeController");
+const { uploadResume, getResume, serveResumeFile } = require("../controllers/resumeController");
 
 const csrfProtection = csurf({ cookie: { httpOnly: true, sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", secure: process.env.NODE_ENV === "production" } });
 
@@ -27,6 +27,9 @@ router.post(
   }),
   handleMulterError(uploadResume)
 );
+
+// GET /api/resumes/file/:resumeId — serve raw file from DB (used by AI service + frontend)
+router.get("/file/:resumeId", serveResumeFile);
 
 // GET /api/resumes/:candidateId
 router.get("/:candidateId", handleMulterError(getResume));

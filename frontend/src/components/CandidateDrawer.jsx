@@ -295,9 +295,9 @@ export default function CandidateDrawer({ candidate, onClose, onRescreen }) {
             </p>
           )}
           <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
-            {candidate.resume_serve_name && (
+            {candidate.resume_id && (
               <a
-                href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/uploads/${candidate.resume_serve_name}`}
+                href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/api/resumes/file/${candidate.resume_id}`}
                 target="_blank" rel="noopener noreferrer"
                 style={st.viewResumeBtn}
               >
