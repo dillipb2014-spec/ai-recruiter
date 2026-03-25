@@ -1,11 +1,4 @@
-const ALLOWED_HOSTS = (process.env.NEXT_PUBLIC_ALLOWED_API_HOSTS || "localhost:4000").split(",");
-
-const BASE_URL = (() => {
-  const url  = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-  const host = new URL(url).host;
-  if (!ALLOWED_HOSTS.includes(host)) throw new Error(`Untrusted API host: ${host}`);
-  return url;
-})();
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 export function apiUrl(urlPath) {
   const url = new URL(urlPath, BASE_URL);
