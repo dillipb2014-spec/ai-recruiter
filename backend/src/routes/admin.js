@@ -5,24 +5,31 @@ const { sendScreeningTest } = require("../controllers/candidateController");
 
 const router = express.Router();
 
-// Simple in-memory session store
-const sessions = new Map();
-
-function createSession(recruiter) {
+async function createSession(recruiter) {
   const token = crypto.randomBytes(32).toString("hex");
-  sessions.set(token, { id: recruiter.id, name: recruiter.name, email: recruiter.email, role: recruiter.role });
-  setTimeout(() => sessions.delete(token), 8 * 60 * 60 * 1000); // 8h expiry
+  const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  await db.query(
+    `INSERT INTO recruiter_sessions (token, recruiter_id, data, expires_at)
+     VALUES ($1, $2, $3, $4)`,
+    [token, recruiter.id, JSON.stringify({ id: recruiter.id, name: recruiter.name, email: recruiter.email, role: recruiter.role }), expiresAt]
+  );
   return token;
 }
 
-function getSession(req) {
+async function getSession(req) {
   const token = req.cookies?.["auth_token"];
-  return token ? sessions.get(token) : null;
+  if (!token) return null;
+  const result = await db.query(
+    "SELECT data FROM recruiter_sessions WHERE token = $1 AND expires_at > NOW()",
+    [token]
+  );
+  return result.rows.length ? result.rows[0].data : null;
 }
 
 // Middleware — protect recruiter routes
-function requireAuth(req, res, next) {
-  if (!getSession(req)) return res.status(401).json({ error: "Unauthorized" });
+async function requireAuth(req, res, next) {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: "Unauthorized" });
   next();
 }
 
@@ -38,7 +45,7 @@ router.post("/login", async (req, res) => {
   const hash = crypto.createHash("sha256").update(password).digest("hex");
   if (hash !== recruiter.password_hash) return res.status(401).json({ error: "Invalid credentials" });
 
-  const token = createSession(recruiter);
+  const token = await createSession(recruiter);
   res.cookie("auth_token", token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -49,16 +56,16 @@ router.post("/login", async (req, res) => {
 });
 
 // POST /api/admin/logout
-router.post("/logout", (req, res) => {
+router.post("/logout", async (req, res) => {
   const token = req.cookies?.["auth_token"];
-  if (token) sessions.delete(token);
+  if (token) await db.query("DELETE FROM recruiter_sessions WHERE token = $1", [token]);
   res.clearCookie("auth_token");
   res.json({ ok: true });
 });
 
 // GET /api/admin/me
-router.get("/me", (req, res) => {
-  const session = getSession(req);
+router.get("/me", async (req, res) => {
+  const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Unauthorized" });
   res.json(session);
 });
