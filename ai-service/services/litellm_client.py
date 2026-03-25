@@ -65,7 +65,6 @@ async def _call_model(model: str, prompt: str, system: str, api_base: str = None
         messages=[{"role": "system", "content": system}, {"role": "user", "content": prompt}],
         temperature=0.2,
         max_tokens=2048,
-        response_format={"type": "json_object"},
     )
     if api_base:
         kwargs["api_base"] = api_base
@@ -84,18 +83,19 @@ async def litellm_generate(prompt: str, system: str = SYSTEM_PROMPT) -> str:
     grid_model = os.getenv("JUSPAY_GRID_MODEL", "open-large")
 
     if grid_key:
-        try:
-            return await _call_model(
-                f"openai/{grid_model}", prompt, system,
-                api_base=grid_base, api_key=grid_key
-            )
-        except Exception as e:
-            print(f"Juspay Grid failed ({e}), falling back to Ollama...")
+        return await _call_model(
+            f"openai/{grid_model}", prompt, system,
+            api_base=grid_base, api_key=grid_key
+        )
 
-    return await _call_model(
-        "ollama/llama3:latest", prompt, system,
-        api_base="http://127.0.0.1:11434"
-    )
+    # Local dev only — Ollama fallback
+    if os.getenv("NODE_ENV") != "production" and os.getenv("RENDER") is None:
+        return await _call_model(
+            "ollama/llama3:latest", prompt, system,
+            api_base="http://127.0.0.1:11434"
+        )
+
+    raise RuntimeError("No LLM configured — set JUSPAY_GRID_API_KEY env var")
 
 
 ollama_generate = litellm_generate
