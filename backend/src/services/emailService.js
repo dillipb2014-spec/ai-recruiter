@@ -1,13 +1,33 @@
-const nodemailer = require("nodemailer");
+const https = require("https");
 
-const FROM = process.env.SMTP_FROM || "JUSPAY AI Recruitment <no-reply@juspay.in>";
+const FROM = process.env.SMTP_FROM || "GeniusHire AI <onboarding@resend.dev>";
 
-function _transport() {
-  return nodemailer.createTransport({
-    host:   process.env.SMTP_HOST || "smtp.resend.com",
-    port:   parseInt(process.env.SMTP_PORT || "465", 10),
-    secure: true,
-    auth:   { user: process.env.SMTP_USER || "resend", pass: process.env.SMTP_PASS || "" },
+async function _sendViaResend(to, subject, html) {
+  const apiKey = process.env.RESEND_API_KEY || process.env.SMTP_PASS;
+  if (!apiKey) throw new Error("RESEND_API_KEY is not set");
+
+  const body = JSON.stringify({ from: FROM, to, subject, html });
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: "api.resend.com",
+      path: "/emails",
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body),
+      },
+    }, (res) => {
+      let data = "";
+      res.on("data", (c) => data += c);
+      res.on("end", () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) resolve(JSON.parse(data));
+        else reject(new Error(`Resend API error ${res.statusCode}: ${data}`));
+      });
+    });
+    req.on("error", reject);
+    req.write(body);
+    req.end();
   });
 }
 
@@ -47,32 +67,24 @@ function _screeningHtml(name, role, link) {
 }
 
 async function sendScreeningTestEmail(candidate, jobRoleTitle) {
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
   const link = `${process.env.APP_URL || "http://localhost:3000"}/screening-test/${candidate.id}`;
-  await _transport().sendMail({
-    from:    FROM,
-    to:      candidate.email,
-    subject: `Next Step: Screening Test — ${jobRoleTitle || "Position"}`,
-    html:    _screeningHtml(candidate.full_name, jobRoleTitle, link),
-  });
+  await _sendViaResend(
+    candidate.email,
+    `Next Step: Screening Test — ${jobRoleTitle || "Position"}`,
+    _screeningHtml(candidate.full_name, jobRoleTitle, link)
+  );
 }
 
 async function sendRejectionEmails(candidates) {
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS)
-    throw new Error("SMTP credentials not configured — set SMTP_USER and SMTP_PASS in backend/.env");
-
-  const t = _transport();
   let sent = 0, failed = 0;
   const errors = [];
-
   for (const c of candidates) {
     try {
-      await t.sendMail({
-        from:    FROM,
-        to:      c.email,
-        subject: `Your Application Update — ${c.job_role_title || "Position"}`,
-        html:    _rejectionHtml(c.full_name, c.job_role_title),
-      });
+      await _sendViaResend(
+        c.email,
+        `Your Application Update — ${c.job_role_title || "Position"}`,
+        _rejectionHtml(c.full_name, c.job_role_title)
+      );
       sent++;
     } catch (err) {
       failed++;
