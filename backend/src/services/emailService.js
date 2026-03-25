@@ -1,6 +1,7 @@
 const https = require("https");
 
 const FROM = process.env.SMTP_FROM || "Juspay AI Recruiter <onboarding@resend.dev>";
+// NOTE: Resend free tier only allows sending from onboarding@resend.dev unless domain is verified
 
 async function _sendViaResend(to, subject, html) {
   const apiKey = process.env.RESEND_API_KEY || process.env.SMTP_PASS;
