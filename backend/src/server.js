@@ -48,7 +48,7 @@ app.use("/api/resumes",      require("./routes/resumes"));
 app.use("/api/job-roles",    require("./routes/jobRoles"));
 app.use("/api/bulk-upload",  require("./routes/bulkUpload"));
 app.use("/api/interviews",   require("./routes/interviews"));
-app.use("/api/admin",        require("./routes/admin"));
+app.use("/api/admin",        require("./routes/admin").router);
 app.use("/api/sms",          require("./routes/sms"));
 
 // Proxy scorecard from AI service
