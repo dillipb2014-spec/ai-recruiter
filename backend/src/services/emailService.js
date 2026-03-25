@@ -1,35 +1,18 @@
-const https = require("https");
+const nodemailer = require("nodemailer");
 
-const FROM = process.env.SMTP_FROM || "Juspay AI Recruiter <onboarding@resend.dev>";
-// NOTE: Resend free tier only allows sending from onboarding@resend.dev unless domain is verified
+const FROM = process.env.SMTP_FROM || `Juspay AI Recruiter <${process.env.SMTP_USER}>`;
+
+function _getTransport() {
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    port: parseInt(process.env.SMTP_PORT || "587"),
+    secure: process.env.SMTP_SECURE === "true",
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  });
+}
 
 async function _sendViaResend(to, subject, html) {
-  const apiKey = process.env.RESEND_API_KEY || process.env.SMTP_PASS;
-  if (!apiKey) throw new Error("RESEND_API_KEY is not set");
-
-  const body = JSON.stringify({ from: FROM, to, subject, html });
-  return new Promise((resolve, reject) => {
-    const req = https.request({
-      hostname: "api.resend.com",
-      path: "/emails",
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "Content-Length": Buffer.byteLength(body),
-      },
-    }, (res) => {
-      let data = "";
-      res.on("data", (c) => data += c);
-      res.on("end", () => {
-        if (res.statusCode >= 200 && res.statusCode < 300) resolve(JSON.parse(data));
-        else reject(new Error(`Resend API error ${res.statusCode}: ${data}`));
-      });
-    });
-    req.on("error", reject);
-    req.write(body);
-    req.end();
-  });
+  await _getTransport().sendMail({ from: FROM, to, subject, html });
 }
 
 function _rejectionHtml(name, role) {
