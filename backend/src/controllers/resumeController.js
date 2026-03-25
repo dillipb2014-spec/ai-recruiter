@@ -6,10 +6,7 @@ const UPLOAD_DIR   = path.resolve(process.env.UPLOAD_DIR || "uploads");
 const INTERNAL_KEY = process.env.INTERNAL_API_KEY || "";
 
 const AI_SCREEN_URL = (() => {
-  const base    = process.env.AI_SERVICE_URL || "http://localhost:8000";
-  const allowed = (process.env.AI_SERVICE_ALLOWED_HOST || "localhost:8000").split(",");
-  const { host } = new URL(base);
-  if (!allowed.includes(host)) throw new Error(`Untrusted AI service host: ${host}`);
+  const base = process.env.AI_SERVICE_URL || "http://localhost:8000";
   return new URL("/screen-resume", base).toString();
 })();
 
