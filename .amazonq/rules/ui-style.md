@@ -1,7 +1,7 @@
-# GeniusHire UI Design Rules (Juspay-Centric)
+# Juspay AI Recruiter UI Design Rules
 
 ## Identity
-- Product name: **GeniusHire AI**
+- Product name: **Juspay AI Recruiter**
 - Design philosophy: Calm Tech — high-density data, zero visual noise, every pixel earns its place.
 
 ## Color Palette
