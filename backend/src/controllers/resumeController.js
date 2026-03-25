@@ -10,13 +10,18 @@ const AI_SCREEN_URL = (() => {
   return new URL("/screen-resume", base).toString();
 })();
 
+const BACKEND_URL  = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 4000}`;
+
 async function triggerAIScreening(resumeId, filePath, retries = 3) {
+  // Convert local path to a public URL the AI service can fetch
+  const fileName  = path.basename(filePath);
+  const publicUrl = `${BACKEND_URL}/uploads/${encodeURIComponent(fileName)}`;
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const response = await fetch(AI_SCREEN_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Internal-Key": INTERNAL_KEY },
-        body: JSON.stringify({ resume_id: resumeId, file_path: filePath }),
+        body: JSON.stringify({ resume_id: resumeId, file_path: publicUrl }),
       });
       if (!response.ok) throw new Error(`AI service responded with ${response.status}`);
       return;

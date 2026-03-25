@@ -27,7 +27,18 @@ async def screen_resume_endpoint(req: ScreenRequest):
 
     try:
         file_path = req.file_path
-        if not os.path.isabs(file_path):
+        # If it's a URL, download it to a temp file
+        if file_path.startswith("http://") or file_path.startswith("https://"):
+            import tempfile, httpx
+            async with httpx.AsyncClient() as client:
+                r = await client.get(file_path, timeout=30)
+                r.raise_for_status()
+            suffix = ".pdf"
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+            tmp.write(r.content)
+            tmp.close()
+            file_path = tmp.name
+        elif not os.path.isabs(file_path):
             file_path = os.path.join(os.getenv("UPLOAD_DIR", "../backend/uploads"), file_path)
 
         if not os.path.exists(file_path):

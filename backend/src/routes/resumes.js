@@ -3,7 +3,7 @@ const csurf  = require("csurf");
 const upload = require("../middleware/upload");
 const { uploadResume, getResume } = require("../controllers/resumeController");
 
-const csrfProtection = csurf({ cookie: { httpOnly: true, sameSite: "lax" } });
+const csrfProtection = csurf({ cookie: { httpOnly: true, sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", secure: process.env.NODE_ENV === "production" } });
 
 const handleMulterError = (fn) => async (req, res, next) => {
   try {
