@@ -7,7 +7,11 @@ const { execFile } = require("child_process");
 const INTERNAL_KEY = process.env.INTERNAL_API_KEY || "";
 const UPLOAD_DIR   = path.resolve(process.env.UPLOAD_DIR || "uploads");
 
-const AI_SCREEN_URL = new URL("/screen-resume", process.env.AI_SERVICE_URL?.startsWith("http") ? process.env.AI_SERVICE_URL : `https://${process.env.AI_SERVICE_URL}` || "http://localhost:8000").toString();
+function getAIScreenURL() {
+  const base = process.env.AI_SERVICE_URL || "http://localhost:8000";
+  const normalized = base.startsWith("http") ? base : `https://${base}`;
+  return new URL("/screen-resume", normalized).toString();
+}
 
 // Convert any Google Drive share/open URL to a direct download URL
 function toDriveDirectUrl(url) {
@@ -54,21 +58,15 @@ async function bulkUpload(req, res) {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
   const role = await db.query("SELECT id, title FROM job_roles WHERE id = $1", [roleId]);
-  if (!role.rows.length) {
-    fs.unlinkSync(req.file.path);
-    return res.status(404).json({ error: "Job role not found" });
-  }
+  if (!role.rows.length) return res.status(404).json({ error: "Job role not found" });
 
   let rows;
   try {
-    const wb = XLSX.readFile(req.file.path);
+    const wb = XLSX.read(req.file.buffer);
     const ws = wb.Sheets[wb.SheetNames[0]];
     rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
   } catch {
-    fs.unlinkSync(req.file.path);
     return res.status(400).json({ error: "Invalid Excel file" });
-  } finally {
-    fs.unlinkSync(req.file.path);
   }
 
   if (!rows.length) return res.status(400).json({ error: "Excel sheet is empty" });

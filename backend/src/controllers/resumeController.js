@@ -2,13 +2,18 @@ const db   = require("../db");
 
 const INTERNAL_KEY  = process.env.INTERNAL_API_KEY || "";
 const BACKEND_URL   = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 4000}`;
-const AI_SCREEN_URL = new URL("/screen-resume", process.env.AI_SERVICE_URL?.startsWith("http") ? process.env.AI_SERVICE_URL : `https://${process.env.AI_SERVICE_URL}` || "http://localhost:8000").toString();
+
+function getAIScreenURL() {
+  const base = process.env.AI_SERVICE_URL || "http://localhost:8000";
+  const normalized = base.startsWith("http") ? base : `https://${base}`;
+  return new URL("/screen-resume", normalized).toString();
+}
 
 async function triggerAIScreening(resumeId, retries = 3) {
   const publicUrl = `${BACKEND_URL}/api/resumes/file/${resumeId}`;
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      const response = await fetch(AI_SCREEN_URL, {
+      const response = await fetch(getAIScreenURL(), {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Internal-Key": INTERNAL_KEY },
         body: JSON.stringify({ resume_id: resumeId, file_path: publicUrl }),
