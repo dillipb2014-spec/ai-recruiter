@@ -53,14 +53,8 @@ export default function LoginPage() {
           {/* Hero text */}
           <div style={s.hero}>
             <div style={s.aiChip}>✦ AI Recruiter</div>
-            <h1 style={s.heroTitle}>
-              Hire smarter,<br />
-              <span style={s.heroAccent}>not harder.</span>
-            </h1>
             <p style={s.heroSub}>
-              Juspay's AI Recruiter automates resume screening, generates role-specific
-              tests, and surfaces the best candidates — so your team focuses on people,
-              not paperwork.
+              Intelligent candidate screening and evaluation
             </p>
           </div>
 
@@ -177,9 +171,7 @@ const s = {
   logoRow:      { marginBottom: 48 },
   hero:         { marginBottom: 40 },
   aiChip:       { display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.15)", color: "#fff", fontSize: 12, fontWeight: 700, padding: "5px 14px", borderRadius: 999, marginBottom: 20, letterSpacing: "0.06em", backdropFilter: "blur(4px)", border: "1px solid rgba(255,255,255,0.2)" },
-  heroTitle:    { margin: "0 0 16px", fontSize: 42, fontWeight: 800, color: "#fff", lineHeight: 1.15, letterSpacing: "-0.02em" },
-  heroAccent:   { color: "#93c5fd" },
-  heroSub:      { margin: 0, fontSize: 15, color: "rgba(255,255,255,0.75)", lineHeight: 1.7, maxWidth: 400 },
+  heroSub:      { margin: 0, fontSize: 16, color: "rgba(255,255,255,0.85)", lineHeight: 1.6, fontWeight: 500 },
   features:     { display: "flex", flexDirection: "column", gap: 20, marginBottom: 48 },
   featureRow:   { display: "flex", alignItems: "flex-start", gap: 14 },
   featureIcon:  { width: 38, height: 38, borderRadius: 10, background: "rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0, border: "1px solid rgba(255,255,255,0.15)" },
