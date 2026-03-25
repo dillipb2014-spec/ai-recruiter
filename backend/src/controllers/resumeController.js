@@ -2,7 +2,7 @@ const db   = require("../db");
 
 const INTERNAL_KEY  = process.env.INTERNAL_API_KEY || "";
 const BACKEND_URL   = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 4000}`;
-const AI_SCREEN_URL = new URL("/screen-resume", process.env.AI_SERVICE_URL || "http://localhost:8000").toString();
+const AI_SCREEN_URL = new URL("/screen-resume", process.env.AI_SERVICE_URL?.startsWith("http") ? process.env.AI_SERVICE_URL : `https://${process.env.AI_SERVICE_URL}` || "http://localhost:8000").toString();
 
 async function triggerAIScreening(resumeId, retries = 3) {
   const publicUrl = `${BACKEND_URL}/api/resumes/file/${resumeId}`;

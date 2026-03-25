@@ -7,7 +7,7 @@ const { execFile } = require("child_process");
 const INTERNAL_KEY = process.env.INTERNAL_API_KEY || "";
 const UPLOAD_DIR   = path.resolve(process.env.UPLOAD_DIR || "uploads");
 
-const AI_SCREEN_URL = new URL("/screen-resume", process.env.AI_SERVICE_URL || "http://localhost:8000").toString();
+const AI_SCREEN_URL = new URL("/screen-resume", process.env.AI_SERVICE_URL?.startsWith("http") ? process.env.AI_SERVICE_URL : `https://${process.env.AI_SERVICE_URL}` || "http://localhost:8000").toString();
 
 // Convert any Google Drive share/open URL to a direct download URL
 function toDriveDirectUrl(url) {
