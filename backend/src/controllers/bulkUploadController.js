@@ -1,11 +1,8 @@
 const db   = require("../db");
 const XLSX = require("xlsx");
-const path = require("path");
-const fs   = require("fs");
 const { execFile } = require("child_process");
 
 const INTERNAL_KEY = process.env.INTERNAL_API_KEY || "";
-const UPLOAD_DIR   = path.resolve(process.env.UPLOAD_DIR || "uploads");
 
 function getAIScreenURL() {
   const base = process.env.AI_SERVICE_URL || "http://localhost:8000";
@@ -13,7 +10,6 @@ function getAIScreenURL() {
   return new URL("/screen-resume", normalized).toString();
 }
 
-// Convert any Google Drive share/open URL to a direct download URL
 function toDriveDirectUrl(url) {
   const openMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
   if (openMatch) return `https://drive.google.com/uc?export=download&confirm=t&id=${openMatch[1]}`;
@@ -22,33 +18,19 @@ function toDriveDirectUrl(url) {
   return url;
 }
 
-// Download file via curl — follows redirects, bypasses Drive virus-scan page
-function downloadFile(url, destPath) {
+function downloadBuffer(url) {
   return new Promise((resolve, reject) => {
     execFile("curl", [
       "-L", "--max-redirs", "10",
       "-A", "Mozilla/5.0",
       "-b", "download_warning=t",
-      "-o", destPath,
+      "-s", "--output", "-",
       url
-    ], { timeout: 30000 }, (err) => {
+    ], { timeout: 30000, maxBuffer: 20 * 1024 * 1024, encoding: "buffer" }, (err, stdout) => {
       if (err) return reject(err);
-      if (!fs.existsSync(destPath)) return reject(new Error("File not created"));
-      const stat = fs.statSync(destPath);
-      if (stat.size < 1000) {
-        fs.unlinkSync(destPath);
-        return reject(new Error("Downloaded file too small — Drive link may not be public"));
-      }
-      // Validate it's actually a PDF (magic bytes %PDF)
-      const buf = Buffer.alloc(5);
-      const fd  = fs.openSync(destPath, "r");
-      fs.readSync(fd, buf, 0, 5, 0);
-      fs.closeSync(fd);
-      if (buf.toString("ascii") !== "%PDF-") {
-        fs.unlinkSync(destPath);
-        return reject(new Error("Downloaded file is not a PDF — Drive link may require login or is not publicly shared"));
-      }
-      resolve();
+      if (!stdout || stdout.length < 1000) return reject(new Error("Downloaded file too small — Drive link may not be public"));
+      if (stdout.slice(0, 5).toString("ascii") !== "%PDF-") return reject(new Error("Not a PDF — Drive link may require login"));
+      resolve(stdout);
     });
   });
 }
