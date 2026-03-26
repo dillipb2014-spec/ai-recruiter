@@ -1,17 +1,17 @@
 const nodemailer = require("nodemailer");
 
-const FROM = process.env.SMTP_FROM || `Juspay AI Recruiter <${process.env.SMTP_USER}>`;
-
 function _getTransport() {
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: parseInt(process.env.SMTP_PORT || "587"),
-    secure: process.env.SMTP_SECURE === "true",
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
   });
 }
 
-async function _sendViaResend(to, subject, html) {
+const FROM = `Juspay AI Recruiter <${process.env.SMTP_USER || "dillipb2898@gmail.com"}>`;
+
+async function _send(to, subject, html) {
   await _getTransport().sendMail({ from: FROM, to, subject, html });
 }
 
@@ -52,7 +52,7 @@ function _screeningHtml(name, role, link) {
 
 async function sendScreeningTestEmail(candidate, jobRoleTitle) {
   const link = `${process.env.APP_URL || "http://localhost:3000"}/screening-test/${candidate.id}`;
-  await _sendViaResend(
+  await _send(
     candidate.email,
     `Next Step: Screening Test — ${jobRoleTitle || "Position"}`,
     _screeningHtml(candidate.full_name, jobRoleTitle, link)
@@ -64,14 +64,14 @@ async function sendRejectionEmails(candidates) {
   const errors = [];
   for (const c of candidates) {
     try {
-      await _sendViaResend(
+      await _send(
         c.email,
         `Your Application Update — ${c.job_role_title || "Position"}`,
         _rejectionHtml(c.full_name, c.job_role_title)
       );
       sent++;
     } catch (err) {
-      failed++;
+      failed++; 
       errors.push(`${c.email}: ${err.message}`);
     }
   }
