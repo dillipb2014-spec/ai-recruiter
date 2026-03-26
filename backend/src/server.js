@@ -128,4 +128,11 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Backend running on port ${PORT}`);
+  // Keep AI service warm — ping every 10 minutes to prevent Render free tier spin-down
+  const AI_URL = process.env.AI_SERVICE_URL || "http://localhost:8000";
+  setInterval(() => {
+    fetch(`${AI_URL}/health`).catch(() => {});
+  }, 10 * 60 * 1000);
+});

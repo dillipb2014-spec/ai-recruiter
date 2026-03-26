@@ -9,7 +9,7 @@ function getAIScreenURL() {
   return new URL("/screen-resume", normalized).toString();
 }
 
-async function triggerAIScreening(resumeId, retries = 3) {
+async function triggerAIScreening(resumeId, retries = 5) {
   const publicUrl = `${BACKEND_URL}/api/resumes/file/${resumeId}`;
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
@@ -22,7 +22,9 @@ async function triggerAIScreening(resumeId, retries = 3) {
       return;
     } catch (err) {
       if (attempt === retries) throw err;
-      await new Promise((r) => setTimeout(r, 500 * attempt));
+      // Wait longer on 502 (service waking up) — up to 30s
+      const delay = err.message.includes("502") ? 15000 : 1000 * attempt;
+      await new Promise((r) => setTimeout(r, delay));
     }
   }
 }
