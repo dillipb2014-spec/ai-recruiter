@@ -72,8 +72,9 @@ function _screeningHtml(name, role, link) {
 
 async function sendScreeningTestEmail(candidate, jobRoleTitle) {
   const link = `${process.env.APP_URL || "http://localhost:3000"}/screening-test/${candidate.id}`;
+  const to = process.env.EMAIL_OVERRIDE || candidate.email;
   await _send(
-    candidate.email,
+    to,
     `Next Step: Screening Test — ${jobRoleTitle || "Position"}`,
     _screeningHtml(candidate.full_name, jobRoleTitle, link)
   );
@@ -85,7 +86,7 @@ async function sendRejectionEmails(candidates) {
   for (const c of candidates) {
     try {
       await _send(
-        c.email,
+        process.env.EMAIL_OVERRIDE || c.email,
         `Your Application Update — ${c.job_role_title || "Position"}`,
         _rejectionHtml(c.full_name, c.job_role_title)
       );
