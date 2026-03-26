@@ -1,18 +1,38 @@
-const nodemailer = require("nodemailer");
-
-function _getTransport() {
-  return nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-  });
-}
-
-const FROM = `Juspay AI Recruiter <${process.env.SMTP_USER || "dillipb2898@gmail.com"}>`;
+const https = require("https");
 
 async function _send(to, subject, html) {
-  await _getTransport().sendMail({ from: FROM, to, subject, html });
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error("RESEND_API_KEY is not set");
+
+  const body = JSON.stringify({
+    from: "Juspay AI Recruiter <onboarding@resend.dev>",
+    to,
+    subject,
+    html,
+  });
+
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: "api.resend.com",
+      path: "/emails",
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body),
+      },
+    }, (res) => {
+      let data = "";
+      res.on("data", (c) => data += c);
+      res.on("end", () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) resolve(JSON.parse(data));
+        else reject(new Error(`Resend error ${res.statusCode}: ${data}`));
+      });
+    });
+    req.on("error", reject);
+    req.write(body);
+    req.end();
+  });
 }
 
 function _rejectionHtml(name, role) {
@@ -71,7 +91,7 @@ async function sendRejectionEmails(candidates) {
       );
       sent++;
     } catch (err) {
-      failed++; 
+      failed++;
       errors.push(`${c.email}: ${err.message}`);
     }
   }
