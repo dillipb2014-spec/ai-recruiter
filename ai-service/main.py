@@ -1,8 +1,10 @@
 import os
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+import httpx
 
 load_dotenv()
 
@@ -14,6 +16,16 @@ from routers import interview
 from routers import jd
 from routers import screening_test
 
+async def _keep_alive():
+    self_url = os.getenv("RENDER_EXTERNAL_URL", "http://localhost:8000")
+    while True:
+        await asyncio.sleep(10 * 60)
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.get(f"{self_url}/health", timeout=10)
+        except Exception:
+            pass
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
@@ -21,6 +33,7 @@ async def lifespan(app: FastAPI):
         print("INFO: Database pool initialized")
     except Exception as e:
         print(f"WARNING: Could not connect to database at startup: {e}")
+    asyncio.create_task(_keep_alive())
     yield
     await close_pool()
 

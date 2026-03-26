@@ -130,9 +130,11 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`Backend running on port ${PORT}`);
-  // Keep AI service warm — ping every 10 minutes to prevent Render free tier spin-down
+  const SELF_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
   const AI_URL = process.env.AI_SERVICE_URL || "http://localhost:8000";
+  // Ping both services every 10 minutes to prevent Render free tier spin-down
   setInterval(() => {
+    fetch(`${SELF_URL}/health`).catch(() => {});
     fetch(`${AI_URL}/health`).catch(() => {});
   }, 10 * 60 * 1000);
 });
