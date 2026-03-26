@@ -87,6 +87,20 @@ router.post("/register", async (req, res) => {
   res.json(result.rows[0]);
 });
 
+// ── GET /api/admin/test-email — temporary diagnostics ───────────────────────
+router.get("/test-email", async (req, res) => {
+  const { sendScreeningTestEmail } = require("../services/emailService");
+  try {
+    await sendScreeningTestEmail(
+      { id: "test-123", full_name: "Test", email: process.env.SMTP_USER },
+      "SDE Frontend"
+    );
+    res.json({ ok: true, smtp_user: process.env.SMTP_USER, smtp_from: process.env.SMTP_FROM, app_url: process.env.APP_URL });
+  } catch (err) {
+    res.status(500).json({ error: err.message, smtp_user: process.env.SMTP_USER, smtp_from: process.env.SMTP_FROM });
+  }
+});
+
 // ── POST /api/admin/send-screening/:id ───────────────────────────────────────
 router.post("/send-screening/:id", requireAuth, sendScreeningTest);
 

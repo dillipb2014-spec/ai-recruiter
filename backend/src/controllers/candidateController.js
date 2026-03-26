@@ -37,7 +37,7 @@ async function registerCandidate(req, res) {
   }
 
   sendScreeningTestEmail(result.rows[0], role.rows[0].title).catch((err) =>
-    console.error("Screening email failed:", err.message)
+    console.error("[EMAIL ERROR] Screening email failed for", result.rows[0].email, ":", err.message)
   );
 
   res.status(201).json({ message: "Candidate registered", candidate: result.rows[0] });
