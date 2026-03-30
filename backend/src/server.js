@@ -93,28 +93,42 @@ app.get("/api/candidates/:id/scorecard", async (req, res) => {
 });
 
 // Proxy: screening test questions + evaluation
+async function proxyAI(url, options = {}) {
+  // Retry once after 20s delay to handle Render free tier spin-up
+  for (let i = 0; i < 2; i++) {
+    try {
+      const r = await fetch(url, { ...options, headers: { ...options.headers, "X-Internal-Key": INTERNAL_KEY } });
+      const text = await r.text();
+      try {
+        const data = JSON.parse(text);
+        return { status: r.status, data };
+      } catch {
+        if (i === 0) { await new Promise(res => setTimeout(res, 20000)); continue; }
+        throw new Error(`AI service unavailable — please try again in a moment`);
+      }
+    } catch (err) {
+      if (i === 0) { await new Promise(res => setTimeout(res, 20000)); continue; }
+      throw err;
+    }
+  }
+}
+
 app.get("/api/screening-test/:candidateId/questions", async (req, res) => {
   try {
-    const r = await fetch(`${AI_BASE}/screening-test/${encodeURIComponent(req.params.candidateId)}/questions`, {
-      headers: { "X-Internal-Key": INTERNAL_KEY },
-    });
-    const data = await r.json();
-    if (!r.ok) return res.status(r.status).json(data);
-    res.json(data);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+    const { status, data } = await proxyAI(`${AI_BASE}/screening-test/${encodeURIComponent(req.params.candidateId)}/questions`);
+    res.status(status).json(data);
+  } catch (err) { res.status(503).json({ error: err.message }); }
 });
 
 app.post("/api/screening-test/:candidateId/evaluate", async (req, res) => {
   try {
-    const r = await fetch(`${AI_BASE}/screening-test/${encodeURIComponent(req.params.candidateId)}/evaluate`, {
+    const { status, data } = await proxyAI(`${AI_BASE}/screening-test/${encodeURIComponent(req.params.candidateId)}/evaluate`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Internal-Key": INTERNAL_KEY },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req.body),
     });
-    const data = await r.json();
-    if (!r.ok) return res.status(r.status).json(data);
-    res.json(data);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+    res.status(status).json(data);
+  } catch (err) { res.status(503).json({ error: err.message }); }
 });
 
 app.get("/health", (req, res) => res.json({ status: "ok" }));
