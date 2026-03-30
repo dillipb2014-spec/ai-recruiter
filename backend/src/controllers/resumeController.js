@@ -50,9 +50,28 @@ async function uploadResume(req, res) {
     );
   }
 
-  triggerAIScreening(result.rows[0].id).catch((err) =>
-    console.error("AI screening trigger failed:", err.message)
-  );
+  triggerAIScreening(result.rows[0].id).then(async () => {
+    // After AI screening completes, send screening test email
+    try {
+      const cRow = await db.query(
+        `SELECT c.full_name, c.email, jr.title AS job_role_title
+         FROM candidates c
+         LEFT JOIN job_roles jr ON jr.id = c.job_role_id
+         WHERE c.id = $1`, [candidateId]
+      );
+      if (cRow.rows.length) {
+        const { sendScreeningTestEmail } = require("../services/emailService");
+        await db.query("UPDATE candidates SET status = 'screening' WHERE id = $1", [candidateId]);
+        await sendScreeningTestEmail(
+          { id: candidateId, full_name: cRow.rows[0].full_name, email: cRow.rows[0].email },
+          cRow.rows[0].job_role_title
+        );
+        console.log(`[email] Screening test sent to ${cRow.rows[0].email}`);
+      }
+    } catch (err) {
+      console.error("[email] Screening email failed:", err.message);
+    }
+  }).catch((err) => console.error("AI screening trigger failed:", err.message));
 
   res.status(201).json({ message: "Resume uploaded successfully", resume: result.rows[0] });
 }

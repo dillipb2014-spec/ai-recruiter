@@ -36,10 +36,7 @@ async function registerCandidate(req, res) {
     );
   }
 
-  sendScreeningTestEmail(result.rows[0], role.rows[0].title).catch((err) =>
-    console.error("[EMAIL ERROR] Screening email failed for", result.rows[0].email, ":", err.message)
-  );
-
+  // Don't send screening email here — it's sent after resume upload + AI screening completes
   res.status(201).json({ message: "Candidate registered", candidate: result.rows[0] });
 }
 
@@ -199,14 +196,16 @@ async function sendScreeningTest(req, res) {
   ).then(() => null).catch((err) => err.message);
 
   // Trigger AI resume screening if resume exists (fire-and-forget)
-  if (candidate.resume_id && candidate.file_path) {
+  if (candidate.resume_id) {
     const AI_BASE      = process.env.AI_SERVICE_URL || "http://localhost:8000";
-    const screenUrl    = new URL("/screen-resume", AI_BASE).toString();
+    const BACKEND_URL  = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 4000}`;
+    const screenUrl    = new URL("/screen-resume", AI_BASE.startsWith("http") ? AI_BASE : `https://${AI_BASE}`).toString();
     const INTERNAL_KEY = process.env.INTERNAL_API_KEY || "";
+    const publicUrl    = `${BACKEND_URL}/api/resumes/file/${candidate.resume_id}`;
     fetch(screenUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Internal-Key": INTERNAL_KEY },
-      body: JSON.stringify({ resume_id: candidate.resume_id, file_path: candidate.file_path }),
+      body: JSON.stringify({ resume_id: candidate.resume_id, file_path: publicUrl }),
     }).catch((err) => console.error("AI screen trigger failed:", err.message));
   }
 
