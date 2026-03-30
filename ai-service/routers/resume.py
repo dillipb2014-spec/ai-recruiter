@@ -19,6 +19,7 @@ class ScreenRequest(BaseModel):
 @router.post("/screen-resume")
 async def screen_resume_endpoint(req: ScreenRequest):
     pool = await get_pool()
+    print(f"[screen-resume] START resume_id={req.resume_id} file_path={req.file_path}")
 
     await pool.execute(
         "UPDATE resumes SET screening_status = 'processing' WHERE id = $1",
@@ -30,6 +31,7 @@ async def screen_resume_endpoint(req: ScreenRequest):
         # If it's a URL, download it to a temp file
         if file_path.startswith("http://") or file_path.startswith("https://"):
             import tempfile, httpx
+            print(f"[screen-resume] downloading from URL: {file_path}")
             # Retry up to 3 times — backend may be waking up on free tier (50s+ spin-up)
             last_err = None
             for attempt in range(3):
@@ -41,10 +43,12 @@ async def screen_resume_endpoint(req: ScreenRequest):
                     break
                 except Exception as e:
                     last_err = e
+                    print(f"[screen-resume] download attempt {attempt+1} failed: {e}")
                     import asyncio
                     await asyncio.sleep(10)
             else:
                 raise RuntimeError(f"Failed to download resume after 3 attempts: {last_err}")
+            print(f"[screen-resume] downloaded {len(content)} bytes")
             suffix = ".pdf" if b"%PDF" in content[:10] else ".docx"
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
             tmp.write(content)
@@ -57,6 +61,7 @@ async def screen_resume_endpoint(req: ScreenRequest):
             raise FileNotFoundError(f"Resume file not found: {file_path}")
 
         resume_text = await extract_text(file_path)
+        print(f"[screen-resume] extracted {len(resume_text)} chars of text")
         if not resume_text.strip():
             raise ValueError("Could not extract text from resume — file may be scanned/image-based")
 
@@ -240,6 +245,7 @@ async def screen_resume_endpoint(req: ScreenRequest):
         }
 
     except Exception as e:
+        print(f"[screen-resume] FAILED resume_id={req.resume_id} error={e}")
         await pool.execute(
             "UPDATE resumes SET screening_status = 'failed' WHERE id = $1",
             req.resume_id,
