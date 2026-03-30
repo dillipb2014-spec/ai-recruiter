@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef } from "react";
-import { uploadResume, bulkUpdateStatus } from "@/lib/api";
+import { uploadResume, bulkUpdateStatus, sendScreeningTest } from "@/lib/api";
 
 const STATUS_COLOR = {
   applied:        { bg: "#eff6ff",  color: "#2563eb" },
@@ -39,7 +39,19 @@ export default function CandidateDrawer({ candidate, onClose, onRescreen }) {
   const [uploadMsg, setUploadMsg]         = useState("");
   const [screening, setScreening]         = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [resending, setResending]         = useState(false);
+  const [resendMsg, setResendMsg]         = useState("");
   const fileRef                           = useRef();
+
+  async function handleResendScreening() {
+    setResending(true); setResendMsg("");
+    try {
+      await sendScreeningTest(candidate.id);
+      setResendMsg("✅ Screening test resent");
+    } catch (e) {
+      setResendMsg(`⚠ ${e.message}`);
+    } finally { setResending(false); }
+  }
 
   async function handleAction(status) {
     setActionLoading(true);
@@ -322,6 +334,22 @@ export default function CandidateDrawer({ candidate, onClose, onRescreen }) {
             </p>
           )}
         </div>
+
+        {/* Resend Screening Test — only for candidates still in screening */}
+        {candidate.status === "screening" && (
+          <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: 16, marginTop: 16 }}>
+            <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.08em" }}>SCREENING TEST</p>
+            <p style={{ margin: "0 0 10px", fontSize: 12, color: "#6b7280" }}>Candidate has not completed the screening test yet.</p>
+            <button
+              onClick={handleResendScreening}
+              disabled={resending}
+              style={{ width: "100%", padding: "10px 0", background: "#eff6ff", color: "#0052cc", border: "1px solid #bfdbfe", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: resending ? "not-allowed" : "pointer", opacity: resending ? 0.7 : 1 }}
+            >
+              {resending ? "Sending…" : "✉ Resend Screening Test"}
+            </button>
+            {resendMsg && <p style={{ margin: "8px 0 0", fontSize: 12, color: resendMsg.startsWith("✅") ? "#16a34a" : "#dc2626" }}>{resendMsg}</p>}
+          </div>
+        )}
 
         {/* Recruiter Action */}
         {(candidate.status === "screen_select" || candidate.status === "SCREEN_SELECT" || candidate.status === "screen_reject" || candidate.status === "SCREEN_REJECT") && (
