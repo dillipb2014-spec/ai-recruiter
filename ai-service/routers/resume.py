@@ -30,12 +30,24 @@ async def screen_resume_endpoint(req: ScreenRequest):
         # If it's a URL, download it to a temp file
         if file_path.startswith("http://") or file_path.startswith("https://"):
             import tempfile, httpx
-            async with httpx.AsyncClient() as client:
-                r = await client.get(file_path, timeout=30)
-                r.raise_for_status()
-            suffix = ".pdf"
+            # Retry up to 3 times — backend may be waking up on free tier (50s+ spin-up)
+            last_err = None
+            for attempt in range(3):
+                try:
+                    async with httpx.AsyncClient(timeout=90) as client:
+                        r = await client.get(file_path)
+                        r.raise_for_status()
+                        content = r.content
+                    break
+                except Exception as e:
+                    last_err = e
+                    import asyncio
+                    await asyncio.sleep(10)
+            else:
+                raise RuntimeError(f"Failed to download resume after 3 attempts: {last_err}")
+            suffix = ".pdf" if b"%PDF" in content[:10] else ".docx"
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-            tmp.write(r.content)
+            tmp.write(content)
             tmp.close()
             file_path = tmp.name
         elif not os.path.isabs(file_path):
