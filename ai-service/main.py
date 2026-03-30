@@ -62,3 +62,20 @@ app.include_router(screening_test.router)
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.on_event("startup")
+async def start_self_ping():
+    import asyncio, httpx, os
+    async def ping_loop():
+        await asyncio.sleep(30)  # wait for startup
+        self_url = os.getenv("RENDER_EXTERNAL_URL", "http://localhost:8000")
+        while True:
+            try:
+                async with httpx.AsyncClient(timeout=10) as client:
+                    await client.get(f"{self_url}/health")
+                    print(f"[keep-alive] pinged {self_url}/health")
+            except Exception as e:
+                print(f"[keep-alive] ping failed: {e}")
+            await asyncio.sleep(8 * 60)  # every 8 minutes
+    asyncio.create_task(ping_loop())

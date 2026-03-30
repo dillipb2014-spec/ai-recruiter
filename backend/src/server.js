@@ -94,8 +94,11 @@ app.get("/api/candidates/:id/scorecard", async (req, res) => {
 
 // Proxy: screening test questions + evaluation
 async function proxyAI(url, options = {}) {
-  // Retry once after 20s delay to handle Render free tier spin-up
-  for (let i = 0; i < 2; i++) {
+  // First, wake up the AI service if it's spun down
+  try { await fetch(`${AI_BASE}/health`, { headers: { "X-Internal-Key": INTERNAL_KEY } }); } catch {}
+  
+  // Retry up to 4 times with increasing delays to handle Render free tier spin-up (50s+)
+  for (let i = 0; i < 4; i++) {
     try {
       const r = await fetch(url, { ...options, headers: { ...options.headers, "X-Internal-Key": INTERNAL_KEY } });
       const text = await r.text();
@@ -103,14 +106,17 @@ async function proxyAI(url, options = {}) {
         const data = JSON.parse(text);
         return { status: r.status, data };
       } catch {
-        if (i === 0) { await new Promise(res => setTimeout(res, 20000)); continue; }
-        throw new Error(`AI service unavailable — please try again in a moment`);
+        console.log(`[proxyAI] attempt ${i+1} got non-JSON (service waking up): ${text.slice(0,100)}`);
+        await new Promise(res => setTimeout(res, 15000));
+        continue;
       }
     } catch (err) {
-      if (i === 0) { await new Promise(res => setTimeout(res, 20000)); continue; }
-      throw err;
+      console.log(`[proxyAI] attempt ${i+1} fetch error: ${err.message}`);
+      await new Promise(res => setTimeout(res, 15000));
+      continue;
     }
   }
+  throw new Error("AI service unavailable — please try again in a moment");
 }
 
 app.get("/api/screening-test/:candidateId/questions", async (req, res) => {
