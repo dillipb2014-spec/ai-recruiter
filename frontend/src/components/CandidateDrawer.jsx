@@ -335,11 +335,13 @@ export default function CandidateDrawer({ candidate, onClose, onRescreen }) {
           )}
         </div>
 
-        {/* Resend Screening Test — only for candidates still in screening */}
-        {candidate.status === "screening" && (
+        {/* Resend Screening Test — for applied + screening candidates */}
+        {(candidate.status === "screening" || candidate.status === "applied" || candidate.status === "uploaded") && (
           <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: 16, marginTop: 16 }}>
             <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.08em" }}>SCREENING TEST</p>
-            <p style={{ margin: "0 0 10px", fontSize: 12, color: "#6b7280" }}>Candidate has not completed the screening test yet.</p>
+            <p style={{ margin: "0 0 10px", fontSize: 12, color: "#6b7280" }}>
+              {candidate.status === "screening" ? "Candidate has not completed the screening test yet." : "Send a screening test to this candidate."}
+            </p>
             <button
               onClick={handleResendScreening}
               disabled={resending}
