@@ -1,7 +1,7 @@
 import asyncio
 import os
 
-WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")  # tiny | base | small | medium | large
+WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")
 
 _model = None
 
@@ -13,16 +13,15 @@ def _load_model():
         import whisper
         print(f"INFO: Loading Whisper model '{WHISPER_MODEL}'...")
         _model = whisper.load_model(WHISPER_MODEL)
-        print("INFO: Whisper model loaded.")
         return _model
+    except ImportError:
+        raise RuntimeError("Whisper not installed — video interview transcription unavailable")
     except Exception as e:
-        print(f"WARNING: Whisper model failed to load: {e}")
         raise RuntimeError(f"Whisper unavailable: {e}") from e
 
 async def transcribe(audio_path: str) -> dict:
     loop = asyncio.get_running_loop()
-    result = await loop.run_in_executor(None, _transcribe_sync, audio_path)
-    return result
+    return await loop.run_in_executor(None, _transcribe_sync, audio_path)
 
 def _transcribe_sync(audio_path: str) -> dict:
     model = _load_model()
