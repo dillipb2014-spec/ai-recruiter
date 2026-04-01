@@ -145,7 +145,7 @@ async def evaluate_screening_test(candidate_id: str, req: EvaluateRequest):
         for i, qa in enumerate(req.answers)
     )
 
-    prompt = f"""You are evaluating screening test answers for a {job_title} role at Juspay.
+    prompt = f"""You are a strict technical interviewer evaluating screening test answers for a {job_title} role at Juspay.
 
 JOB DESCRIPTION:
 {jd_text or "Not provided."}
@@ -155,21 +155,29 @@ MANDATORY SKILLS: {", ".join(mandatory) if mandatory else "None"}
 CANDIDATE ANSWERS:
 {qa_text}
 
-Scoring rules:
-- Score each answer out of 10. total_score = sum of all 5 scores (max 100).
-- Do NOT reference resume score.
-- If total_score >= 50 → decision = "SCREEN SELECT", else "SCREEN REJECT".
+Scoring rules (BE STRICT):
+- Score each answer 0-10 based on technical depth, accuracy and relevance.
+- 9-10: Exceptional — specific, detailed, demonstrates real experience
+- 7-8: Good — correct and relevant but lacks depth
+- 5-6: Average — partially correct or vague
+- 3-4: Weak — mostly incorrect or very superficial
+- 0-2: Poor — wrong, irrelevant, or "I don't know"
+- Penalize one-line or generic answers heavily (max 4/10)
+- Penalize answers that don't address the specific question (max 3/10)
+- total_score = sum of all 5 scores (max 50, scaled to 100 by multiplying by 2)
+- If total_score >= 50 → decision = "SCREEN SELECT", else "SCREEN REJECT"
+- Most candidates should score between 30-70. Reserve 80+ for truly exceptional answers.
 
 Respond with ONLY this JSON:
 {{
   "total_score": <0-100 integer>,
   "decision": "SCREEN SELECT" | "SCREEN REJECT",
   "question_scores": [
-    {{"index": 1, "score": <0-10>, "question": "<question text>", "answer": "<one sentence eval of the answer>"}},
-    {{"index": 2, "score": <0-10>, "question": "<question text>", "answer": "<one sentence eval of the answer>"}},
-    {{"index": 3, "score": <0-10>, "question": "<question text>", "answer": "<one sentence eval of the answer>"}},
-    {{"index": 4, "score": <0-10>, "question": "<question text>", "answer": "<one sentence eval of the answer>"}},
-    {{"index": 5, "score": <0-10>, "question": "<question text>", "answer": "<one sentence eval of the answer>"}}
+    {{"index": 1, "score": <0-10>, "question": "<question text>", "answer": "<one sentence eval>"}},
+    {{"index": 2, "score": <0-10>, "question": "<question text>", "answer": "<one sentence eval>"}},
+    {{"index": 3, "score": <0-10>, "question": "<question text>", "answer": "<one sentence eval>"}},
+    {{"index": 4, "score": <0-10>, "question": "<question text>", "answer": "<one sentence eval>"}},
+    {{"index": 5, "score": <0-10>, "question": "<question text>", "answer": "<one sentence eval>"}}
   ],
   "summary": "<one sentence overall summary>"
 }}"""
@@ -183,6 +191,13 @@ Respond with ONLY this JSON:
         data = {}
 
     ai_total_score = max(0.0, min(100.0, float(data.get("total_score", 50))))
+    # Normalize: if LLM returned score out of 50, scale to 100
+    if ai_total_score <= 50 and len(req.answers) >= 5:
+        per_q_scores = data.get("question_scores", [])
+        if per_q_scores:
+            raw_sum = sum(float(q.get("score", 0)) for q in per_q_scores)
+            if raw_sum <= 50:  # scores are 0-10 each, sum max 50
+                ai_total_score = min(100.0, raw_sum * 2)  # scale to 100
     per_q = data.get("question_scores", [])
     # Merge actual candidate answers into per_q
     for i, qa in enumerate(req.answers):
