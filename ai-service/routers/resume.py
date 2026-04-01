@@ -177,14 +177,27 @@ async def screen_resume_endpoint(req: ScreenRequest):
 
         if not candidate_id:
             print(f"WARNING: No candidate_id for resume {req.resume_id} — skipping candidate update")
-        elif cur_status in ("uploaded", "applied"):
-            # Resume scored but screening not yet triggered — keep status as-is
-            print(f"Candidate {candidate_id} is '{cur_status}', keeping status unchanged after resume score")
-            new_status = cur_status
+        elif cur_status in ("uploaded", "applied", "PENDING"):
+            # Resume scored — set to screening and send email
+            print(f"Candidate {candidate_id} is '{cur_status}', setting to screening and sending email")
+            new_status = "screening"
             await pool.execute(
-                "UPDATE candidates SET ai_decision_insight = $1 WHERE id = $2",
+                "UPDATE candidates SET status = 'screening', ai_decision_insight = $1 WHERE id = $2",
                 result.get("decision_insight") or None, candidate_id,
             )
+            # Send screening test email via backend
+            try:
+                backend_url = os.getenv("BACKEND_URL", "http://localhost:4000")
+                internal_key = os.getenv("INTERNAL_API_KEY", "")
+                import httpx as _httpx
+                async with _httpx.AsyncClient(timeout=30) as client:
+                    await client.post(
+                        f"{backend_url}/api/admin/send-screening/{candidate_id}",
+                        headers={"X-Internal-Key": internal_key, "Content-Type": "application/json"},
+                    )
+                print(f"[screen-resume] screening email triggered for {candidate_id}")
+            except Exception as email_err:
+                print(f"[screen-resume] email trigger failed: {email_err}")
         else:
             print(f"Updating candidate {candidate_id} → status={new_status}, score={result['ai_score']}")
             await pool.execute(

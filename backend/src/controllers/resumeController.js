@@ -56,24 +56,35 @@ async function uploadResume(req, res) {
     // After AI screening completes, send screening test email
     try {
       const cRow = await db.query(
-        `SELECT c.full_name, c.email, jr.title AS job_role_title
+        `SELECT c.full_name, c.email, c.status, jr.title AS job_role_title
          FROM candidates c
          LEFT JOIN job_roles jr ON jr.id = c.job_role_id
          WHERE c.id = $1`, [candidateId]
       );
       if (cRow.rows.length) {
+        const c = cRow.rows[0];
         const { sendScreeningTestEmail } = require("../services/emailService");
-        await db.query("UPDATE candidates SET status = 'screening' WHERE id = $1", [candidateId]);
-        await sendScreeningTestEmail(
-          { id: candidateId, full_name: cRow.rows[0].full_name, email: cRow.rows[0].email },
-          cRow.rows[0].job_role_title
-        );
-        console.log(`[email] Screening test sent to ${cRow.rows[0].email}`);
+        // Only send email if AI moved candidate to screen_select/screen_reject
+        if (["screen_select", "screen_reject", "uploaded", "applied"].includes(c.status)) {
+          await db.query("UPDATE candidates SET status = 'screening' WHERE id = $1", [candidateId]);
+          await sendScreeningTestEmail(
+            { id: candidateId, full_name: c.full_name, email: c.email },
+            c.job_role_title
+          );
+          console.log(`[email] Screening test sent to ${c.email}`);
+        } else {
+          // AI already updated status — just send the email
+          await sendScreeningTestEmail(
+            { id: candidateId, full_name: c.full_name, email: c.email },
+            c.job_role_title
+          );
+          console.log(`[email] Screening test sent to ${c.email} (status=${c.status})`);
+        }
       }
     } catch (err) {
       console.error("[email] Screening email failed:", err.message);
     }
-  }).catch((err) => console.error("AI screening trigger failed:", err.message));
+  }).catch((err) => console.error("[AI] screening trigger failed:", err.message));
 
   res.status(201).json({ message: "Resume uploaded successfully", resume: result.rows[0] });
 }
