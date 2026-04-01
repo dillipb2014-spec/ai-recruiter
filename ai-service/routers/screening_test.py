@@ -191,13 +191,12 @@ Respond with ONLY this JSON:
         data = {}
 
     ai_total_score = max(0.0, min(100.0, float(data.get("total_score", 50))))
-    # Normalize: if LLM returned score out of 50, scale to 100
-    if ai_total_score <= 50 and len(req.answers) >= 5:
-        per_q_scores = data.get("question_scores", [])
-        if per_q_scores:
-            raw_sum = sum(float(q.get("score", 0)) for q in per_q_scores)
-            if raw_sum <= 50:  # scores are 0-10 each, sum max 50
-                ai_total_score = min(100.0, raw_sum * 2)  # scale to 100
+    # Normalize: per-question scores are 0-10 each, 5 questions = max 50
+    # Scale to 0-100 by summing per-question scores and multiplying by 2
+    per_q = data.get("question_scores", [])
+    if per_q:
+        raw_sum = sum(float(q.get("score", 0)) for q in per_q)
+        ai_total_score = min(100.0, round(raw_sum * 2, 1))  # 50 max → 100%
     per_q = data.get("question_scores", [])
     # Merge actual candidate answers into per_q
     for i, qa in enumerate(req.answers):
@@ -210,8 +209,8 @@ Respond with ONLY this JSON:
 
     screening_score_final = ai_total_score
 
-    # Step 1: Add Resume + Screening. Step 2: Divide by 2.
-    final_score = round((resume_score_final + screening_score_final) / 2, 2)
+    # Weighted: Resume 40% + Screening Test 60%
+    final_score = round((resume_score_final * 0.4) + (screening_score_final * 0.6), 2)
 
     if final_score >= 50:
         new_status = "screen_select"
