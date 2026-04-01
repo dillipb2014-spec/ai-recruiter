@@ -1,38 +1,21 @@
-const https = require("https");
+const nodemailer = require("nodemailer");
+
+function _createTransport() {
+  return nodemailer.createTransport({
+    host:   process.env.SMTP_HOST   || "smtp.gmail.com",
+    port:   parseInt(process.env.SMTP_PORT || "587"),
+    secure: process.env.SMTP_SECURE === "true",
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+}
 
 async function _send(to, subject, html) {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new Error("RESEND_API_KEY is not set");
-
-  const body = JSON.stringify({
-    from: "Juspay AI Recruiter <onboarding@resend.dev>",
-    to,
-    subject,
-    html,
-  });
-
-  return new Promise((resolve, reject) => {
-    const req = https.request({
-      hostname: "api.resend.com",
-      path: "/emails",
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "Content-Length": Buffer.byteLength(body),
-      },
-    }, (res) => {
-      let data = "";
-      res.on("data", (c) => data += c);
-      res.on("end", () => {
-        if (res.statusCode >= 200 && res.statusCode < 300) resolve(JSON.parse(data));
-        else reject(new Error(`Resend error ${res.statusCode}: ${data}`));
-      });
-    });
-    req.on("error", reject);
-    req.write(body);
-    req.end();
-  });
+  const from = process.env.SMTP_FROM || `Juspay AI Recruiter <${process.env.SMTP_USER}>`;
+  const transporter = _createTransport();
+  await transporter.sendMail({ from, to, subject, html });
 }
 
 function _rejectionHtml(name, role) {
@@ -72,7 +55,7 @@ function _screeningHtml(name, role, link) {
 
 async function sendScreeningTestEmail(candidate, jobRoleTitle) {
   const link = `${process.env.APP_URL || "http://localhost:3000"}/screening-test/${candidate.id}`;
-  const to = process.env.EMAIL_OVERRIDE || candidate.email;
+  const to = candidate.email;
   await _send(
     to,
     `Next Step: Screening Test — ${jobRoleTitle || "Position"}`,
@@ -86,7 +69,7 @@ async function sendRejectionEmails(candidates) {
   for (const c of candidates) {
     try {
       await _send(
-        process.env.EMAIL_OVERRIDE || c.email,
+        c.email,
         `Your Application Update — ${c.job_role_title || "Position"}`,
         _rejectionHtml(c.full_name, c.job_role_title)
       );
