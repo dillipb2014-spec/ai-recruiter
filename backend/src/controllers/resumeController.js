@@ -9,8 +9,9 @@ function getAIScreenURL() {
   return new URL("/screen-resume", normalized).toString();
 }
 
-async function triggerAIScreening(resumeId, retries = 5) {
+async function triggerAIScreening(resumeId, retries = 3) {
   const publicUrl = `${BACKEND_URL}/api/resumes/file/${resumeId}`;
+  console.log(`[AI] Triggering screening for resume ${resumeId} via ${publicUrl}`);
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const response = await fetch(getAIScreenURL(), {
@@ -18,13 +19,14 @@ async function triggerAIScreening(resumeId, retries = 5) {
         headers: { "Content-Type": "application/json", "X-Internal-Key": INTERNAL_KEY },
         body: JSON.stringify({ resume_id: resumeId, file_path: publicUrl }),
       });
-      if (!response.ok) throw new Error(`AI service responded with ${response.status}`);
+      const text = await response.text();
+      console.log(`[AI] attempt ${attempt} status=${response.status} body=${text.slice(0,200)}`);
+      if (!response.ok) throw new Error(`AI service responded with ${response.status}: ${text.slice(0,100)}`);
       return;
     } catch (err) {
+      console.error(`[AI] attempt ${attempt} failed: ${err.message}`);
       if (attempt === retries) throw err;
-      // Wait longer on 502 (service waking up) — up to 30s
-      const delay = err.message.includes("502") ? 15000 : 1000 * attempt;
-      await new Promise((r) => setTimeout(r, delay));
+      await new Promise((r) => setTimeout(r, 20000));
     }
   }
 }
