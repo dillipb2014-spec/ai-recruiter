@@ -3,17 +3,26 @@ const express      = require("express");
 const cors         = require("cors");
 const cookieParser = require("cookie-parser");
 const csurf        = require("csurf");
+const helmet       = require("helmet");
+const rateLimit    = require("express-rate-limit");
 const path         = require("path");
 const fs           = require("fs");
 
 const app = express();
 
+// ── Security headers
+app.use(helmet({ contentSecurityPolicy: false }));
+
 // Ensure uploads directory exists
 const uploadDir = process.env.UPLOAD_DIR || "uploads";
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-// ── Middleware ──────────────────────────────────────────
-const _origins = (process.env.ALLOWED_ORIGIN || "http://localhost:3000").split(",").map((o) => o.trim());
+// ── CORS — never allow wildcard with credentials
+const _rawOrigins = process.env.ALLOWED_ORIGIN || "http://localhost:3000";
+const _origins = _rawOrigins === "*"
+  ? ["http://localhost:3000"]  // fallback safe default — never allow * with credentials
+  : _rawOrigins.split(",").map((o) => o.trim()).filter(Boolean);
+
 app.use(cors({
   origin: (origin, cb) => cb(null, !origin || _origins.includes(origin)),
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
@@ -21,6 +30,15 @@ app.use(cors({
 }));
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
+
+// ── Global rate limiter
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.path === "/health",
+}));
 // Serve uploads — validate PDF magic bytes before serving
 app.use("/uploads", (req, res, next) => {
   const filePath = path.resolve(path.join(uploadDir, req.path));
@@ -144,7 +162,8 @@ app.use((err, req, res, next) => {
   if (err.code === "EBADCSRFTOKEN")
     return res.status(403).json({ error: "Invalid CSRF token" });
   console.error(err);
-  res.status(500).json({ error: err.message || "Internal server error" });
+  const msg = process.env.NODE_ENV === "production" ? "Internal server error" : (err.message || "Internal server error");
+  res.status(500).json({ error: msg });
 });
 
 const PORT = process.env.PORT || 4000;

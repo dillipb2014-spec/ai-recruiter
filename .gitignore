@@ -2,18 +2,25 @@
 .env
 .env.local
 .env.production
+.env.development
+**/.env
+**/.env.local
+
+# Virtual envs
+.venv/
+.venv-1/
+venv/
 
 # Dependencies
 node_modules/
 .next/
-.venv/
-venv/
 __pycache__/
 *.pyc
 
 # Uploads
 backend/uploads/
 /tmp/uploads/
+uploads/
 
 # Keys
 *.pem
@@ -21,3 +28,4 @@ backend/uploads/
 
 # OS
 .DS_Store
+Thumbs.db
