@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 const AI_URL      = 'http://localhost:8000';
-const INTERNAL_KEY = 'change_me_internal_secret';
+const INTERNAL_KEY = process.env.INTERNAL_API_KEY || 'change_me_internal_secret';
 
 const resumes = [
   { resume_id: '57846c94-1db6-4c1f-9b8a-3d40fbddad60', file_path: '/Users/dillip.behera/Downloads/ai-recruiter/backend/uploads/f399bd00-e5ee-48f7-8bd1-5017a6bf8cc8.pdf', name: 'Chandan' },

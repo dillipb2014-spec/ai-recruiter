@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: ai_recruiter
       POSTGRES_USER: recruiter
-      POSTGRES_PASSWORD: recruiter_pass
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-recruiter_pass}
     ports:
       - "5432:5432"
     volumes:
