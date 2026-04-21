@@ -2,12 +2,11 @@ const router  = require("express").Router();
 const csurf   = require("csurf");
 const multer  = require("multer");
 const path    = require("path");
-const { v4: uuidv4 } = require("uuid");
+const { requireAuth } = require("./admin");
 const { bulkUpload, getBulkUpload } = require("../controllers/bulkUploadController");
 
-const csrfProtection = csurf({ cookie: { httpOnly: true, sameSite: "lax" } });
+const csrf = csurf({ cookie: { httpOnly: true, sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", secure: process.env.NODE_ENV === "production" } });
 
-const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR || "uploads");
 const xlsxUpload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
@@ -19,7 +18,7 @@ const xlsxUpload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
 });
 
-router.post("/:roleId", csrfProtection, xlsxUpload.single("file"), bulkUpload);
-router.get("/:bulkId/status", getBulkUpload);
+router.post("/:roleId",        requireAuth, csrf, xlsxUpload.single("file"), bulkUpload);
+router.get("/:bulkId/status",  requireAuth, getBulkUpload);
 
 module.exports = router;

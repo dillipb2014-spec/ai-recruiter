@@ -69,12 +69,14 @@ app.use("/api/interviews",   require("./routes/interviews"));
 app.use("/api/admin",        require("./routes/admin").router);
 app.use("/api/sms",          require("./routes/sms"));
 
+const { requireAuth } = require("./routes/admin");
+
 // Proxy scorecard from AI service
 const INTERNAL_KEY = process.env.INTERNAL_API_KEY || "";
 const AI_BASE      = process.env.AI_SERVICE_URL || "http://localhost:8000";
 
-// Proxy: parse JD via AI service
-app.post("/api/parse-jd", async (req, res) => {
+// Proxy: parse JD via AI service (recruiter only)
+app.post("/api/parse-jd", requireAuth, async (req, res) => {
   try {
     const { FormData, Blob } = await import("node:buffer").catch(() => ({}));
     // Forward raw body as multipart to AI service
@@ -97,7 +99,7 @@ app.post("/api/parse-jd", async (req, res) => {
   }
 });
 
-app.get("/api/candidates/:id/scorecard", async (req, res) => {
+app.get("/api/candidates/:id/scorecard", requireAuth, async (req, res) => {
   try {
     const r = await fetch(`${AI_BASE}/scorecard/${encodeURIComponent(req.params.id)}`, {
       headers: { "X-Internal-Key": INTERNAL_KEY },
