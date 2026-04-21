@@ -1,10 +1,5 @@
-const twilio = require("twilio")(process.env.TWILIO_SID, process.env.TWILIO_TOKEN);
-
+// SMS provider removed — WhatsApp is handled directly via web.whatsapp.com links in the UI
 exports.send = async (to, body) => {
-  const msg = await twilio.messages.create({
-    from: "whatsapp:+14155238886",
-    to:   `whatsapp:${to}`,
-    body,
-  });
-  return { sid: msg.sid, status: msg.status };
+  console.log(`[SMS] Message to ${to}: ${body}`);
+  return { sid: null, status: "logged" };
 };
