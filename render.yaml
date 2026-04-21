@@ -3,7 +3,7 @@ services:
     name: geniushire-backend
     runtime: node
     rootDir: backend
-    buildCommand: npm install && npx prisma generate --config prisma.config.ts
+    buildCommand: npm install
     startCommand: node src/server.js
     envVars:
       - key: NODE_ENV
